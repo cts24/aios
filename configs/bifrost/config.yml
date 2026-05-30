@@ -5,7 +5,7 @@ server:
 cache:
   type: redis
   redis:
-    addr: "redis:6379"
+    addr: "aios-redis.qpid2b.0001.use1.cache.amazonaws.com:6379"
     ttl: 3600
   semantic_similarity: 0.95
 
@@ -15,7 +15,7 @@ rate_limit:
 
 vault:
   enabled: true
-  addr: "http://10.80.0.20:8200"
+  addr: "http://172.31.79.159:8200"
 
 logging:
   level: info

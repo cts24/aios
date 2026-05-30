@@ -2,19 +2,40 @@ all:
   children:
     ec2_ai:
       hosts:
-        aios-ec2-1:
-          ansible_host: 10.0.1.10
+        aios-ec1:
+          ansible_host: 32.196.225.55
           ansible_user: ubuntu
-          ansible_ssh_private_key_file: ~/.ssh/aios-ec2.pem
-          role: ai
-          compose_file: docker-compose-aios.yml
-          env_file: .env.aios
+          ansible_ssh_private_key_file: ~/.ssh/aios-ec2-key
+          role: ai-core
+          compose_file: docker/docker-compose-ec1.yml
+          env_file: .env.ec1
+    ec2_data:
+      hosts:
+        aios-ec2:
+          ansible_host: 172.31.66.54
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ~/.ssh/aios-ec2-key
+          ansible_ssh_common_args: -o ProxyCommand="ssh -i ~/.ssh/aios-ec2-key -W %h:%p ubuntu@32.196.225.55"
+          role: data
+          compose_file: docker/docker-compose-ec2.yml
+          env_file: .env.ec2
+    ec2_voice:
+      hosts:
+        aios-ec3:
+          ansible_host: 172.31.64.70
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ~/.ssh/aios-ec2-key
+          ansible_ssh_common_args: -o ProxyCommand="ssh -i ~/.ssh/aios-ec2-key -W %h:%p ubuntu@32.196.225.55"
+          role: voice-vision
+          compose_file: docker/docker-compose-ec3.yml
+          env_file: .env.ec3
     ec2_apps:
       hosts:
-        aios-ec2-2:
-          ansible_host: 10.0.2.10
+        aios-ec4:
+          ansible_host: 172.31.79.159
           ansible_user: ubuntu
-          ansible_ssh_private_key_file: ~/.ssh/aios-ec2.pem
+          ansible_ssh_private_key_file: ~/.ssh/aios-ec2-key
+          ansible_ssh_common_args: -o ProxyCommand="ssh -i ~/.ssh/aios-ec2-key -W %h:%p ubuntu@32.196.225.55"
           role: apps
-          compose_file: docker-compose-apps.yml
-          env_file: .env.apps
+          compose_file: docker/docker-compose-ec4.yml
+          env_file: .env.ec4

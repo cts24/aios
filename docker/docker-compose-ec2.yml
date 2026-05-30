@@ -1,0 +1,49 @@
+name: aios-ec2
+
+networks:
+  data-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.30.0.0/24
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    networks:
+      data-net:
+        ipv4_address: 10.30.0.20
+    volumes:
+      - qdrant-storage:/qdrant/storage
+    ports:
+      - "0.0.0.0:6333:6333"
+
+  mem0:
+    image: mem0ai/mem0:latest
+    container_name: mem0
+    restart: unless-stopped
+    networks:
+      data-net:
+        ipv4_address: 10.30.0.35
+    env_file:
+      - ../.env.ec2
+    ports:
+      - "0.0.0.0:8001:8000"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    networks:
+      data-net:
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "0.0.0.0:9100:9100"
+
+volumes:
+  qdrant-storage:

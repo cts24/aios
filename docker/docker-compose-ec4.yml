@@ -1,0 +1,316 @@
+name: aios-ec4
+
+networks:
+  app-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.70.0.0/24
+  identity-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.80.0.0/24
+
+services:
+  # ── IDENTITY & SECRETS ──
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: keycloak
+    restart: unless-stopped
+    networks:
+      identity-net:
+        ipv4_address: 10.80.0.10
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - ../configs/keycloak:/opt/keycloak/data/import
+    command: start-dev --import-realm
+    ports:
+      - "0.0.0.0:8080:8080"
+
+  vault:
+    image: hashicorp/vault:latest
+    container_name: vault
+    restart: unless-stopped
+    networks:
+      identity-net:
+        ipv4_address: 10.80.0.20
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - vault-data:/vault/data
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "0.0.0.0:8200:8200"
+
+  paperclip:
+    image: paperclip/paperclip:latest
+    container_name: paperclip
+    restart: unless-stopped
+    networks:
+      identity-net:
+        ipv4_address: 10.80.0.30
+    depends_on:
+      - keycloak
+    env_file:
+      - ../.env.ec4
+    ports:
+      - "0.0.0.0:3002:3000"
+
+  # ── ERP & FINANCE ──
+  odoo:
+    image: odoo:18
+    container_name: odoo
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.10
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - odoo-data:/var/lib/odoo
+      - ../configs/odoo:/etc/odoo
+    ports:
+      - "0.0.0.0:8069:8069"
+
+  erpnext:
+    image: frappe/erpnext:latest
+    container_name: erpnext
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.20
+    depends_on:
+      - erpnext-db
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - erpnext-data:/home/frappe/frappe-bench/sites
+    ports:
+      - "0.0.0.0:8001:8000"
+
+  erpnext-db:
+    image: mariadb:10.11
+    container_name: erpnext-db
+    restart: unless-stopped
+    networks:
+      app-net:
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - erpnext-db-data:/var/lib/mysql
+
+  # ── CRM ──
+  twenty-crm:
+    image: twentysix/twenty:latest
+    container_name: twenty-crm
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.30
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - twenty-crm-data:/app/data
+    ports:
+      - "0.0.0.0:3003:3000"
+
+  suitecrm:
+    image: bitnami/suitecrm:latest
+    container_name: suitecrm
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.35
+    depends_on:
+      - suitecrm-db
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - suitecrm-data:/bitnami
+    ports:
+      - "0.0.0.0:8081:80"
+
+  suitecrm-db:
+    image: mariadb:10.11
+    container_name: suitecrm-db
+    restart: unless-stopped
+    networks:
+      app-net:
+    environment:
+      MYSQL_DATABASE: suitecrm
+      MYSQL_USER: suitecrm
+      MYSQL_PASSWORD: ${SUITECRM_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${SUITECRM_ROOT_PASSWORD}
+    volumes:
+      - suitecrm-db-data:/var/lib/mysql
+
+  # ── PRODUCTIVITY ──
+  calcom:
+    image: calcom/calcom:latest
+    container_name: calcom
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.40
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - calcom-data:/calcom/data
+    ports:
+      - "0.0.0.0:3004:3000"
+
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.50
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - paperless-data:/usr/src/paperless/data
+      - paperless-media:/usr/src/paperless/media
+    ports:
+      - "0.0.0.0:8082:8000"
+
+  docuseal:
+    image: docuseal/docuseal:latest
+    container_name: docuseal
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.55
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - docuseal-data:/data
+    ports:
+      - "0.0.0.0:3005:3000"
+
+  planka:
+    image: plagron/planka:latest
+    container_name: planka
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.60
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - planka-data:/app/data
+    ports:
+      - "0.0.0.0:3006:1337"
+
+  rocketchat:
+    image: rocketchat/rocket.chat:latest
+    container_name: rocketchat
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.65
+    depends_on:
+      - rocketchat-db
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - rocketchat-data:/app/uploads
+    ports:
+      - "0.0.0.0:3007:3000"
+
+  rocketchat-db:
+    image: bitnami/mongodb:7.0
+    container_name: rocketchat-db
+    restart: unless-stopped
+    networks:
+      app-net:
+    environment:
+      MONGODB_DATABASE: rocketchat
+      MONGODB_USERNAME: rocketchat
+      MONGODB_PASSWORD: ${ROCKETCHAT_DB_PASSWORD}
+      MONGODB_ROOT_PASSWORD: ${ROCKETCHAT_ROOT_PASSWORD}
+    volumes:
+      - rocketchat-db-data:/bitnami/mongodb
+
+  # ── ANALYTICS ──
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.70
+    env_file:
+      - ../.env.ec4
+    volumes:
+      - metabase-data:/metabase.db
+    ports:
+      - "0.0.0.0:3008:3000"
+
+  # ── VOICE UI ──
+  issabel:
+    image: issabel/issabel:latest
+    container_name: issabel
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.80
+      identity-net:
+    depends_on:
+      - keycloak
+    volumes:
+      - ../configs/issabel:/etc/issabel
+    ports:
+      - "0.0.0.0:8083:80"
+      - "0.0.0.0:4443:443"
+
+  # ── CENTRAL MCP SERVER ──
+  central-mcp:
+    image: node:20-alpine
+    container_name: central-mcp
+    restart: unless-stopped
+    networks:
+      app-net:
+        ipv4_address: 10.70.0.90
+      identity-net:
+    working_dir: /app
+    volumes:
+      - ../configs/mcp-server:/app
+    command: sh -c "npm install && node server.js"
+    env_file:
+      - ../.env.ec4
+    ports:
+      - "0.0.0.0:3100:3100"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    networks:
+      app-net:
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "0.0.0.0:9100:9100"
+
+volumes:
+  vault-data:
+  odoo-data:
+  erpnext-data:
+  erpnext-db-data:
+  twenty-crm-data:
+  suitecrm-data:
+  suitecrm-db-data:
+  calcom-data:
+  paperless-data:
+  paperless-media:
+  docuseal-data:
+  planka-data:
+  rocketchat-data:
+  rocketchat-db-data:
+  metabase-data:

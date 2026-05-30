@@ -1,0 +1,125 @@
+name: aios-ec3
+
+networks:
+  voice-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.50.0.0/24
+  vision-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.55.0.0/24
+
+services:
+  # ── VOICE ──
+  asterisk:
+    image: andrius/asterisk:latest
+    container_name: asterisk
+    restart: unless-stopped
+    networks:
+      voice-net:
+        ipv4_address: 10.50.0.10
+    volumes:
+      - ../configs/asterisk:/etc/asterisk
+    ports:
+      - "0.0.0.0:5060:5060/udp"
+      - "0.0.0.0:10000-10100:10000-10100/udp"
+
+  dograh:
+    image: dograh/dograh:latest
+    container_name: dograh
+    restart: unless-stopped
+    networks:
+      voice-net:
+        ipv4_address: 10.50.0.20
+    env_file:
+      - ../.env.ec3
+    volumes:
+      - ../configs/dograh:/etc/dograh
+    ports:
+      - "0.0.0.0:5001:5000"
+
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: whisper
+    restart: unless-stopped
+    networks:
+      voice-net:
+        ipv4_address: 10.50.0.30
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+    ports:
+      - "0.0.0.0:9000:9000"
+
+  kokoro:
+    image: kokoro-tts:latest
+    container_name: kokoro
+    restart: unless-stopped
+    networks:
+      voice-net:
+        ipv4_address: 10.50.0.40
+    ports:
+      - "0.0.0.0:5005:5000"
+
+  # ── VISION ──
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:0.17
+    container_name: frigate
+    restart: unless-stopped
+    privileged: true
+    networks:
+      vision-net:
+        ipv4_address: 10.55.0.10
+    volumes:
+      - ../configs/frigate:/config
+      - frigate-media:/media/frigate
+    env_file:
+      - ../.env.ec3
+    ports:
+      - "0.0.0.0:8554:8554"
+      - "0.0.0.0:8971:8971"
+
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: go2rtc
+    restart: unless-stopped
+    networks:
+      vision-net:
+        ipv4_address: 10.55.0.20
+    volumes:
+      - ../configs/go2rtc:/config
+    ports:
+      - "0.0.0.0:1984:1984"
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: mqtt
+    restart: unless-stopped
+    networks:
+      vision-net:
+        ipv4_address: 10.55.0.30
+    volumes:
+      - ../configs/mosquitto:/mosquitto/config
+    ports:
+      - "0.0.0.0:1883:1883"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    networks:
+      vision-net:
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "0.0.0.0:9100:9100"
+
+volumes:
+  frigate-media:

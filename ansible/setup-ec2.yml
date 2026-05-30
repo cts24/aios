@@ -23,9 +23,9 @@
 
     - name: Clone AIOS repository
       git:
-        repo: git@github.com:your-org/aios.git
+        repo: https://github.com/cts24/aios.git
         dest: /aios
-        version: main
+        version: master
       when: not git_dir.stat.exists
 
     - name: Copy env file
@@ -36,20 +36,41 @@
         group: ubuntu
         mode: "0600"
 
-    - name: Create Docker networks
+    - name: Create Docker networks for EC2 #1 (AI Core)
       community.docker.docker_network:
         name: "{{ item }}"
         driver: bridge
       loop:
         - dmz-net
         - ai-net
-        - data-net
+        - monitoring-net
+      when: role == "ai-core"
+
+    - name: Create Docker network for EC2 #2 (Data)
+      community.docker.docker_network:
+        name: data-net
+        driver: bridge
+      when: role == "data"
+
+    - name: Create Docker networks for EC2 #3 (Voice+Vision)
+      community.docker.docker_network:
+        name: "{{ item }}"
+        driver: bridge
+      loop:
         - voice-net
         - vision-net
-        - monitoring-net
-      when: role == "ai"
+      when: role == "voice-vision"
 
-    - name: Deploy AI stack
+    - name: Create Docker networks for EC2 #4 (Apps)
+      community.docker.docker_network:
+        name: "{{ item }}"
+        driver: bridge
+      loop:
+        - app-net
+        - identity-net
+      when: role == "apps"
+
+    - name: Deploy Docker stack
       community.docker.docker_compose_v2:
         project_src: /aios
         files:
