@@ -1,0 +1,2 @@
+http_ban:
+  webhook: http://traefik:8080/api/v1/decision
