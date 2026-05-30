@@ -4,5 +4,5 @@ filters:
 decisions:
   - type: ban
     duration: 4h
-notifications:
-  - http_ban
+#notifications:
+#  - http_ban
