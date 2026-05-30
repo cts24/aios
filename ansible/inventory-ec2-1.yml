@@ -1,0 +1,37 @@
+all:
+  children:
+    ec2_ai:
+      hosts:
+        aios-ec1:
+          ansible_connection: local
+          ansible_host: 127.0.0.1
+          role: ai-core
+          compose_file: /aios/docker/docker-compose-ec1.yml
+          env_file: /aios/.env.ec1
+    ec2_data:
+      hosts:
+        aios-ec2:
+          ansible_host: 172.31.66.54
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+          role: data
+          compose_file: /aios/docker/docker-compose-ec2.yml
+          env_file: /aios/.env.ec2
+    ec2_voice:
+      hosts:
+        aios-ec3:
+          ansible_host: 172.31.64.70
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+          role: voice-vision
+          compose_file: /aios/docker/docker-compose-ec3.yml
+          env_file: /aios/.env.ec3
+    ec2_apps:
+      hosts:
+        aios-ec4:
+          ansible_host: 172.31.79.159
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+          role: apps
+          compose_file: /aios/docker/docker-compose-ec4.yml
+          env_file: /aios/.env.ec4
