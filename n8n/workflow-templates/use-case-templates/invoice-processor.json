@@ -1,0 +1,236 @@
+{
+  "name": "01 — Invoice Processor",
+  "nodes": [
+    {
+      "id": "ua1b3c4d-0001-4000-8000-000000000001",
+      "name": "WhatsApp Photo",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "invoice-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "invoice-{{client_id}}"
+    },
+    {
+      "id": "ua1b3c4d-0001-4000-8000-000000000002",
+      "name": "Parse Upload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "image_url", "value": "={{$json.body.media_url}}" },
+            { "name": "sender", "value": "={{$json.body.from}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ua1b3c4d-0001-4000-8000-000000000003",
+      "name": "Bifrost — LLaVA Extract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "gpt-4o" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Extract invoice data as JSON: vendor, amount, date, tax, invoice_number, line_items\"},{\"role\":\"user\",\"content\":[{\"type\":\"image_url\",\"image_url\":{\"url\":$json.image_url}}]}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ua1b3c4d-0001-4000-8000-000000000004",
+      "name": "Supabase — Dupe Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "{{supabase_url}}/rest/v1/invoices?invoice_number=eq.{{invoice_number}}&select=count",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{supabase_key}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ua1b3c4d-0001-4000-8000-000000000005",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300],
+      "parameters": {
+        "conditions": {
+          "number": [
+            { "value1": "={{$json.count}}", "operation": "equal", "value2": 0 }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ua1b3c4d-0001-4000-8000-000000000006",
+      "name": "ERPNext — Create Bill",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "{{erp_url}}/api/resource/Purchase Invoice",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "data", "value": "={\"supplier\":\"{{vendor}}\",\"posting_date\":\"{{date}}\",\"total\":{{amount}},\"tax_amount\":{{tax}},\"bill_no\":\"{{invoice_number}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ua1b3c4d-0001-4000-8000-000000000007",
+      "name": "Paperless — Archive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "{{paperless_url}}/api/documents/post_document/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{paperless_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "title", "value": "=Invoice {{invoice_number}} - {{vendor}}" },
+            { "name": "created", "value": "={{date}}" },
+            { "name": "document", "value": "={{image_url}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ua1b3c4d-0001-4000-8000-000000000008",
+      "name": "WhatsApp — Confirm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{sender}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"✅ Invoice {{invoice_number}} from {{vendor}} for PKR {{amount}} processed.\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ua1b3c4d-0001-4000-8000-000000000009",
+      "name": "WhatsApp — Duplicate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{sender}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"⚠️ Invoice {{invoice_number}} already exists in system.\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "WhatsApp Photo": {
+      "main": [[ { "node": "Parse Upload", "type": "main", "index": 0 } ]]
+    },
+    "Parse Upload": {
+      "main": [[ { "node": "Bifrost — LLaVA Extract", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — LLaVA Extract": {
+      "main": [[ { "node": "Supabase — Dupe Check", "type": "main", "index": 0 } ]]
+    },
+    "Supabase — Dupe Check": {
+      "main": [[ { "node": "Check Duplicate", "type": "main", "index": 0 } ]]
+    },
+    "Check Duplicate": {
+      "main": [
+        [ { "node": "ERPNext — Create Bill", "type": "main", "index": 0 } ],
+        [ { "node": "WhatsApp — Duplicate", "type": "main", "index": 0 } ]
+      ]
+    },
+    "ERPNext — Create Bill": {
+      "main": [[ { "node": "Paperless — Archive", "type": "main", "index": 0 } ]]
+    },
+    "Paperless — Archive": {
+      "main": [[ { "node": "WhatsApp — Confirm", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["finance", "invoicing"],
+  "versionId": "1.0.0"
+}

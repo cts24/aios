@@ -1,0 +1,78 @@
+{
+  "name": "05 — Vendor Payment Scheduler",
+  "nodes": [
+    {
+      "id": "ya1b3c4d-0001-4000-8000-000000000001",
+      "name": "Cron Weekly Mon 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "cronExpression": { "cronExpression": "0 9 * * 1" }
+        }
+      }
+    },
+    {
+      "id": "ya1b3c4d-0001-4000-8000-000000000002",
+      "name": "ERPNext — Due In 3 Days",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "{{erp_url}}/api/resource/Purchase Invoice?filters={\"status\":\"Unpaid\",\"due_date\":\"{{three_days_from_now}}\"}&fields=[\"name\",\"supplier\",\"supplier_phone\",\"total\",\"due_date\"]",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ya1b3c4d-0001-4000-8000-000000000003",
+      "name": "WhatsApp — Payment Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{manager_phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"💳 Payment Due in 3 Days\\nVendor: {{supplier}}\\nAmount: PKR {{total}}\\nDue: {{due_date}}\\nInvoice: {{name}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron Weekly Mon 9am": {
+      "main": [[ { "node": "ERPNext — Due In 3 Days", "type": "main", "index": 0 } ]]
+    },
+    "ERPNext — Due In 3 Days": {
+      "main": [[ { "node": "WhatsApp — Payment Alert", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["finance", "vendors"],
+  "versionId": "1.0.0"
+}

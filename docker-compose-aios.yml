@@ -1,0 +1,470 @@
+version: "3.9"
+
+name: aios
+
+networks:
+  dmz-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/24
+  ai-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.20.0.0/24
+  data-net:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.30.0.0/24
+  voice-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.50.0.0/24
+  vision-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.55.0.0/24
+  monitoring-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.60.0.0/24
+
+services:
+  # ────────────────────────────────────────────
+  # TIER 2 — SECURITY (DMZ)
+  # ────────────────────────────────────────────
+
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    networks:
+      dmz-net:
+        ipv4_address: 10.10.0.10
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./configs/traefik:/etc/traefik
+    labels:
+      - "traefik.enable=true"
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.6
+    container_name: crowdsec
+    restart: unless-stopped
+    networks:
+      dmz-net:
+        ipv4_address: 10.10.0.20
+    volumes:
+      - ./configs/crowdsec:/etc/crowdsec
+      - /var/log:/var/log:ro
+
+  # ────────────────────────────────────────────
+  # TIER 3 — AI GATEWAY + INTELLIGENCE
+  # ────────────────────────────────────────────
+
+  bifrost:
+    image: bifrost-gateway/bifrost:latest
+    container_name: bifrost
+    restart: unless-stopped
+    networks:
+      ai-net:
+        ipv4_address: 10.20.0.10
+      data-net:
+    depends_on:
+      - redis
+    env_file:
+      - .env.aios
+    volumes:
+      - ./configs/bifrost:/etc/bifrost
+    ports:
+      - "4000:4000"
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    networks:
+      ai-net:
+        ipv4_address: 10.20.0.20
+      data-net:
+      voice-net:
+    depends_on:
+      - redis
+    env_file:
+      - .env.aios
+    volumes:
+      - ./n8n:/home/node/.n8n
+    ports:
+      - "5678:5678"
+
+  n8n-worker:
+    image: n8nio/n8n:latest
+    container_name: n8n-worker
+    restart: unless-stopped
+    networks:
+      ai-net:
+      data-net:
+    depends_on:
+      - redis
+    env_file:
+      - .env.aios
+    command: worker --concurrency=10
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      data-net:
+        ipv4_address: 10.30.0.30
+    volumes:
+      - redis-data:/data
+
+  # ────────────────────────────────────────────
+  # TIER 4 — VISUAL AI
+  # ────────────────────────────────────────────
+
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:0.17
+    container_name: frigate
+    restart: unless-stopped
+    privileged: true
+    networks:
+      vision-net:
+        ipv4_address: 10.55.0.10
+    volumes:
+      - ./configs/frigate:/config
+      - frigate-media:/media/frigate
+    env_file:
+      - .env.aios
+    ports:
+      - "8554:8554"
+      - "8971:8971"
+
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: go2rtc
+    restart: unless-stopped
+    networks:
+      vision-net:
+        ipv4_address: 10.55.0.20
+    volumes:
+      - ./configs/go2rtc:/config
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: mqtt
+    restart: unless-stopped
+    networks:
+      vision-net:
+        ipv4_address: 10.55.0.30
+    volumes:
+      - ./configs/mosquitto:/mosquitto/config
+    ports:
+      - "1883:1883"
+
+  # ────────────────────────────────────────────
+  # TIER 5 — VOICE AI
+  # ────────────────────────────────────────────
+
+  asterisk:
+    image: andrius/asterisk:latest
+    container_name: asterisk
+    restart: unless-stopped
+    networks:
+      voice-net:
+        ipv4_address: 10.50.0.10
+    volumes:
+      - ./configs/asterisk:/etc/asterisk
+    ports:
+      - "5060:5060/udp"
+      - "10000-10100:10000-10100/udp"
+
+  dograh:
+    image: dograh/dograh:latest
+    container_name: dograh
+    restart: unless-stopped
+    networks:
+      voice-net:
+        ipv4_address: 10.50.0.20
+      ai-net:
+    depends_on:
+      - bifrost
+    env_file:
+      - .env.aios
+    volumes:
+      - ./configs/dograh:/etc/dograh
+
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: whisper
+    restart: unless-stopped
+    networks:
+      voice-net:
+        ipv4_address: 10.50.0.30
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+
+  kokoro:
+    image: kokoro-tts:latest
+    container_name: kokoro
+    restart: unless-stopped
+    networks:
+      voice-net:
+        ipv4_address: 10.50.0.40
+
+  # ────────────────────────────────────────────
+  # TIER 7 — DATA & MEMORY (all internal:true)
+  # ────────────────────────────────────────────
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    networks:
+      data-net:
+        ipv4_address: 10.30.0.20
+    volumes:
+      - qdrant-data:/qdrant/storage
+    ports:
+      - "6333:6333"
+
+  supabase-db:
+    image: supabase/postgres:15.1.1.47
+    container_name: supabase-db
+    restart: unless-stopped
+    networks:
+      data-net:
+        ipv4_address: 10.30.0.10
+    env_file:
+      - .env.aios
+    volumes:
+      - supabase-db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  supabase-kong:
+    image: kong:3.4
+    container_name: supabase-kong
+    restart: unless-stopped
+    networks:
+      data-net:
+    depends_on:
+      - supabase-db
+    env_file:
+      - .env.aios
+    ports:
+      - "8000:8000"
+
+  mem0:
+    image: mem0ai/mem0:latest
+    container_name: mem0
+    restart: unless-stopped
+    networks:
+      data-net:
+        ipv4_address: 10.30.0.35
+    depends_on:
+      - supabase-db
+    env_file:
+      - .env.aios
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    networks:
+      data-net:
+        ipv4_address: 10.30.0.40
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  # ────────────────────────────────────────────
+  # AGENT FRAMEWORKS
+  # ────────────────────────────────────────────
+
+  langgraph:
+    image: langchain/langgraph:latest
+    container_name: langgraph
+    restart: unless-stopped
+    networks:
+      ai-net:
+        ipv4_address: 10.20.0.30
+    depends_on:
+      - bifrost
+    env_file:
+      - .env.aios
+
+  crewai:
+    image: crewai/crewai:latest
+    container_name: crewai
+    restart: unless-stopped
+    networks:
+      ai-net:
+        ipv4_address: 10.20.0.40
+    depends_on:
+      - bifrost
+    env_file:
+      - .env.aios
+
+  # ────────────────────────────────────────────
+  # MONITORING
+  # ────────────────────────────────────────────
+
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:latest
+    container_name: langfuse
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+        ipv4_address: 10.60.0.10
+      data-net:
+    depends_on:
+      - supabase-db
+    env_file:
+      - .env.aios
+    ports:
+      - "3000:3000"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+        ipv4_address: 10.60.0.20
+    volumes:
+      - ./configs/prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+        ipv4_address: 10.60.0.30
+    depends_on:
+      - prometheus
+      - loki
+    env_file:
+      - .env.aios
+    volumes:
+      - ./configs/grafana:/etc/grafana
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3100:3000"
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+        ipv4_address: 10.60.0.40
+    volumes:
+      - ./configs/loki:/etc/loki
+      - loki-data:/loki
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+        ipv4_address: 10.60.0.50
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    ports:
+      - "9000:9000"
+
+  dashy:
+    image: lissy93/dashy:latest
+    container_name: dashy
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+        ipv4_address: 10.60.0.70
+    volumes:
+      - ./configs/dashy:/app/public/conf
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+        ipv4_address: 10.60.0.80
+    volumes:
+      - uptime-kuma-data:/app/data
+    ports:
+      - "3001:3001"
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+        ipv4_address: 10.60.0.90
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # ────────────────────────────────────────────
+  # CI/CD
+  # ────────────────────────────────────────────
+
+  argocd:
+    image: argoproj/argocd:latest
+    container_name: argocd
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+        ipv4_address: 10.60.0.100
+    volumes:
+      - argocd-data:/home/argocd
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  trivy:
+    image: aquasec/trivy:latest
+    container_name: trivy
+    restart: unless-stopped
+    networks:
+      monitoring-net:
+
+volumes:
+  redis-data:
+  qdrant-data:
+  supabase-db-data:
+  minio-data:
+  frigate-media:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  portainer-data:
+  uptime-kuma-data:
+  argocd-data:

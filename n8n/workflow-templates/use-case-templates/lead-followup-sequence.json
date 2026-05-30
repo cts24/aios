@@ -1,0 +1,151 @@
+{
+  "name": "05 — Lead Followup Sequence",
+  "nodes": [
+    {
+      "id": "ee1a2b3c-0001-4000-8000-000000000001",
+      "name": "Cron Daily 10am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "cronExpression": { "cronExpression": "0 10 * * *" }
+        }
+      }
+    },
+    {
+      "id": "ee1a2b3c-0001-4000-8000-000000000002",
+      "name": "Twenty CRM — Active Leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "{{crm_url}}/rest/v1/leads?status=in.Needs_Followup,Contacted&limit=50",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{crm_api_key}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ee1a2b3c-0001-4000-8000-000000000003",
+      "name": "Check Touchpoint",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "jsCode": "const leads = $input.all();\nconst touchpoints = [\n  { day: 1, msg: 'Follow up on our chat' },\n  { day: 3, msg: 'Share a relevant resource' },\n  { day: 5, msg: 'Ask about their timeline' },\n  { day: 7, msg: 'Share a case study' },\n  { day: 10, msg: 'Offer a free consultation' },\n  { day: 14, msg: 'Check if still interested' },\n  { day: 18, msg: 'Share a special offer' },\n  { day: 21, msg: 'Ask for feedback' },\n  { day: 25, msg: 'Share news about {{company_name}}' },\n  { day: 30, msg: 'Final follow-up' }\n];\n\nreturn leads.map(lead => {\n  const created = new Date(lead.json.created_at);\n  const daysSince = Math.floor((new Date() - created) / (1000*60*60*24));\n  const sentTouchpoints = lead.json.touchpoints_sent || 0;\n  const nextTp = touchpoints.find(t => t.day > daysSince && touchpoints.indexOf(t) >= sentTouchpoints);\n  return {\n    json: {\n      ...lead.json,\n      daysSince,\n      nextTouchpoint: nextTp || null\n    }\n  };\n}).filter(l => l.json.nextTouchpoint !== null);"
+      }
+    },
+    {
+      "id": "ee1a2b3c-0001-4000-8000-000000000004",
+      "name": "Bifrost — Gen Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "mistral-7b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Generate a personalized WhatsApp message for lead follow-up. {{nextTouchpoint.msg}}. Language: {{language}}. Business: {{company_name}}. Be conversational, not salesy.\"},{\"role\":\"user\",\"content\":\"Lead: {{name}}, source: {{source}}, day {{daysSince}} of follow-up\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ee1a2b3c-0001-4000-8000-000000000005",
+      "name": "WhatsApp — Send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"{{$node['Bifrost — Gen Message'].json.choices[0].message.content}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ee1a2b3c-0001-4000-8000-000000000006",
+      "name": "CRM — Update Touchpoint",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300],
+      "parameters": {
+        "method": "PATCH",
+        "url": "{{crm_url}}/rest/v1/leads/{{lead_id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{crm_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "touchpoints_sent", "value": "={{$node['Check Touchpoint'].json.nextTouchpoint.day}}" },
+            { "name": "last_contacted", "value": "={{new Date().toISOString()}}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron Daily 10am": {
+      "main": [[ { "node": "Twenty CRM — Active Leads", "type": "main", "index": 0 } ]]
+    },
+    "Twenty CRM — Active Leads": {
+      "main": [[ { "node": "Check Touchpoint", "type": "main", "index": 0 } ]]
+    },
+    "Check Touchpoint": {
+      "main": [[ { "node": "Bifrost — Gen Message", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Gen Message": {
+      "main": [[ { "node": "WhatsApp — Send", "type": "main", "index": 0 } ]]
+    },
+    "WhatsApp — Send": {
+      "main": [[ { "node": "CRM — Update Touchpoint", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["marketing", "leads"],
+  "versionId": "1.0.0"
+}

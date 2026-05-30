@@ -1,0 +1,106 @@
+pageInfo:
+  title: AIOS
+  description: AI Operating System — Lab Navigation
+  logo: https://aios.local/logo.svg
+
+appConfig:
+  theme: midnight
+  iconSize: large
+  layout: auto
+
+sections:
+  - name: TEAM
+    items:
+      - title: Business Supervisor
+        description: Business ops assistant — WhatsApp / Telegram / Web / Voice
+        url: https://supervisor.aios.local
+        icon: fas fa-robot
+      - title: Hermes
+        description: DevOps agent — Telegram / WhatsApp alerts
+        url: https://hermes.aios.local
+        icon: fas fa-server
+      - title: OpenClaw
+        description: Personal AI assistant — WhatsApp / Telegram
+        url: https://openclaw.aios.local
+        icon: fas fa-user-astronaut
+
+  - name: MONITORING
+    items:
+      - title: Grafana
+        description: All metrics — infra + LLM + business
+        url: https://grafana.aios.local
+        icon: fas fa-chart-line
+      - title: Langfuse
+        description: LLM observability — cost, latency, quality
+        url: https://langfuse.aios.local
+        icon: fas fa-eye
+      - title: Prometheus
+        description: Raw infrastructure metrics
+        url: https://prometheus.aios.local
+        icon: fas fa-microchip
+      - title: Loki
+        description: Centralized log search
+        url: https://logs.aios.local
+        icon: fas fa-search
+      - title: Uptime Kuma
+        description: Service health monitoring
+        url: https://status.aios.local
+        icon: fas fa-heartbeat
+      - title: Portainer
+        description: Docker container management
+        url: https://portainer.aios.local
+        icon: fab fa-docker
+
+  - name: AI SERVICES
+    items:
+      - title: n8n
+        description: Workflow orchestrator
+        url: https://n8n.aios.local
+        icon: fas fa-code-branch
+      - title: Bifrost
+        description: AI Gateway dashboard
+        url: https://bifrost.aios.local
+        icon: fas fa-cloud
+      - title: Qdrant
+        description: Vector database
+        url: https://qdrant.aios.local
+        icon: fas fa-database
+
+  - name: BUSINESS APPS
+    items:
+      - title: Odoo
+        url: https://odoo.aios.local
+        icon: fas fa-cubes
+      - title: ERPNext
+        url: https://erpnext.aios.local
+        icon: fas fa-building
+      - title: Twenty CRM
+        url: https://crm.aios.local
+        icon: fas fa-address-book
+      - title: Metabase
+        url: https://metabase.aios.local
+        icon: fas fa-chart-pie
+      - title: Calcom
+        url: https://calcom.aios.local
+        icon: fas fa-calendar
+      - title: Issabel
+        url: https://issabel.aios.local
+        icon: fas fa-phone
+      - title: Rocket.Chat
+        url: https://chat.aios.local
+        icon: fas fa-comments
+      - title: Paperless
+        url: https://paperless.aios.local
+        icon: fas fa-file-alt
+      - title: Docuseal
+        url: https://docuseal.aios.local
+        icon: fas fa-file-signature
+      - title: Paperclip
+        url: https://paperclip.aios.local
+        icon: fas fa-robot
+      - title: Keycloak
+        url: https://keycloak.aios.local
+        icon: fas fa-shield-alt
+      - title: Vault
+        url: https://vault.aios.local
+        icon: fas fa-key

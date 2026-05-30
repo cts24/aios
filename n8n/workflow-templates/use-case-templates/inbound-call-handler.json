@@ -1,0 +1,244 @@
+{
+  "name": "01 — Inbound Call Handler",
+  "nodes": [
+    {
+      "id": "h1a2b3c4-0001-4000-8000-000000000001",
+      "name": "Dograh Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "inbound-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "inbound-{{client_id}}"
+    },
+    {
+      "id": "h1a2b3c4-0001-4000-8000-000000000002",
+      "name": "Parse Call Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "caller_number", "value": "={{$json.caller_id}}" },
+            { "name": "transcript", "value": "={{$json.transcript}}" },
+            { "name": "call_id", "value": "={{$json.call_id}}" },
+            { "name": "ivr_selection", "value": "={{$json.ivr}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "h1a2b3c4-0001-4000-8000-000000000003",
+      "name": "Mem0 — Get Caller",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "http://10.30.0.35:8000/memory/{{caller_number}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{mem0_key}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "h1a2b3c4-0001-4000-8000-000000000004",
+      "name": "Route by IVR",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [900, 300],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json.ivr_selection}}",
+        "routingRules": [
+          { "value": "1", "outputKey": "faq" },
+          { "value": "2", "outputKey": "booking" },
+          { "value": "3", "outputKey": "complaint" }
+        ]
+      }
+    },
+    {
+      "id": "h1a2b3c4-0001-4000-8000-000000000005",
+      "name": "Dograh — FAQ Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "{{dograh_url}}/api/agents/faq-{{client_id}}/respond",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{dograh_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "call_id", "value": "={{call_id}}" },
+            { "name": "text", "value": "={{transcript}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "h1a2b3c4-0001-4000-8000-000000000006",
+      "name": "Dograh — Booking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{dograh_url}}/api/agents/booking-{{client_id}}/respond",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{dograh_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "call_id", "value": "={{call_id}}" },
+            { "name": "text", "value": "={{transcript}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "h1a2b3c4-0001-4000-8000-000000000007",
+      "name": "ERPNext — Create Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 500],
+      "parameters": {
+        "method": "POST",
+        "url": "{{erp_url}}/api/resource/Issue",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "data", "value": "={\"subject\":\"{{transcript | truncate(100)}}\",\"customer\":\"{{caller_number}}\",\"description\":\"{{transcript}}\",\"status\":\"Open\",\"call_id\":\"{{call_id}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "h1a2b3c4-0001-4000-8000-000000000008",
+      "name": "Mem0 — Write Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.30.0.35:8000/memory/{{caller_number}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{mem0_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messages", "value": "={{transcript}}" },
+            { "name": "user_id", "value": "={{caller_number}}" },
+            { "name": "metadata", "value": "={\"client_id\":\"{{client_id}}\",\"call_id\":\"{{call_id}}\",\"ivr\":\"{{ivr_selection}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "h1a2b3c4-0001-4000-8000-000000000009",
+      "name": "Langfuse — Log Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.60.0.10:3000/api/public/observations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{langfuse_secret_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "inbound-call" },
+            { "name": "type", "value": "GENERATION" },
+            { "name": "input", "value": "={{transcript}}" },
+            { "name": "output", "value": "={{$node['ERPNext — Create Ticket'].json.status}}" },
+            { "name": "model", "value": "dograh-voice" },
+            { "name": "projectId", "value": "={{client_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Dograh Webhook": {
+      "main": [[ { "node": "Parse Call Context", "type": "main", "index": 0 } ]]
+    },
+    "Parse Call Context": {
+      "main": [[ { "node": "Mem0 — Get Caller", "type": "main", "index": 0 } ]]
+    },
+    "Mem0 — Get Caller": {
+      "main": [[ { "node": "Route by IVR", "type": "main", "index": 0 } ]]
+    },
+    "Route by IVR": {
+      "main": [
+        [ { "node": "Dograh — FAQ Response", "type": "main", "index": 0 } ],
+        [ { "node": "Dograh — Booking", "type": "main", "index": 0 } ],
+        [ { "node": "ERPNext — Create Ticket", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Dograh — FAQ Response": {
+      "main": [[ { "node": "Mem0 — Write Call", "type": "main", "index": 0 } ]]
+    },
+    "Dograh — Booking": {
+      "main": [[ { "node": "Mem0 — Write Call", "type": "main", "index": 0 } ]]
+    },
+    "ERPNext — Create Ticket": {
+      "main": [[ { "node": "Mem0 — Write Call", "type": "main", "index": 0 } ]]
+    },
+    "Mem0 — Write Call": {
+      "main": [[ { "node": "Langfuse — Log Call", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["callcentre", "inbound"],
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,145 @@
+{
+  "name": "06 — Bank Reconciliation",
+  "nodes": [
+    {
+      "id": "za1b3c4d-0001-4000-8000-000000000001",
+      "name": "Cron Weekly Sun 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "cronExpression": { "cronExpression": "0 8 * * 0" }
+        }
+      }
+    },
+    {
+      "id": "za1b3c4d-0001-4000-8000-000000000002",
+      "name": "ERPNext — Submit Bank Stmt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{erp_url}}/api/method/erpnext.accounts.doctype.bank_statement_import.bank_statement_import.upload_bank_statement",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "company", "value": "={{company_name}}" },
+            { "name": "bank_account", "value": "={{bank_account}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "za1b3c4d-0001-4000-8000-000000000003",
+      "name": "ERPNext — Run Reconciliation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{erp_url}}/api/method/erpnext.accounts.doctype.bank_reconciliation_tool.bank_reconciliation_tool.reconcile",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "company", "value": "={{company_name}}" },
+            { "name": "bank_account", "value": "={{bank_account}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "za1b3c4d-0001-4000-8000-000000000004",
+      "name": "Bifrost — Summarize",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "mistral-7b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Summarize reconciliation: matched count, unmatched count, total variance. Flag issues.\"},{\"role\":\"user\",\"content\":$json}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "za1b3c4d-0001-4000-8000-000000000005",
+      "name": "WhatsApp — Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{manager_phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"🏦 Bank Reconciliation\\n{{$node['Bifrost — Summarize'].json.choices[0].message.content}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron Weekly Sun 8am": {
+      "main": [[ { "node": "ERPNext — Submit Bank Stmt", "type": "main", "index": 0 } ]]
+    },
+    "ERPNext — Submit Bank Stmt": {
+      "main": [[ { "node": "ERPNext — Run Reconciliation", "type": "main", "index": 0 } ]]
+    },
+    "ERPNext — Run Reconciliation": {
+      "main": [[ { "node": "Bifrost — Summarize", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Summarize": {
+      "main": [[ { "node": "WhatsApp — Owner", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["finance", "reconciliation"],
+  "versionId": "1.0.0"
+}

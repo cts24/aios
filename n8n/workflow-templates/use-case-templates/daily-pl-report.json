@@ -1,0 +1,108 @@
+{
+  "name": "04 — Daily P&L Report",
+  "nodes": [
+    {
+      "id": "xa1b3c4d-0001-4000-8000-000000000001",
+      "name": "Cron 8pm",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "cronExpression": { "cronExpression": "0 20 * * *" }
+        }
+      }
+    },
+    {
+      "id": "xa1b3c4d-0001-4000-8000-000000000002",
+      "name": "ERPNext — Today P&L",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "{{erp_url}}/api/method/erpnext.accounts.report.profit_and_loss_statement.profit_and_loss_statement?company={{company_name}}&from_date={{today}}&to_date={{today}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "xa1b3c4d-0001-4000-8000-000000000003",
+      "name": "Bifrost — Claude Narrate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "claude-4-sonnet" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Summarize daily P&L. Highlight revenue, costs, profit. Flag any anomalies. Language: {{language}}. Max 300 chars.\"},{\"role\":\"user\",\"content\":$json}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "xa1b3c4d-0001-4000-8000-000000000004",
+      "name": "WhatsApp — Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{manager_phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"📊 Daily P&L\\n{{$node['Bifrost — Claude Narrate'].json.choices[0].message.content}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron 8pm": {
+      "main": [[ { "node": "ERPNext — Today P&L", "type": "main", "index": 0 } ]]
+    },
+    "ERPNext — Today P&L": {
+      "main": [[ { "node": "Bifrost — Claude Narrate", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Claude Narrate": {
+      "main": [[ { "node": "WhatsApp — Owner", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["finance", "reporting"],
+  "versionId": "1.0.0"
+}

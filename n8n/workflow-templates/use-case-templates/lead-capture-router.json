@@ -1,0 +1,141 @@
+{
+  "name": "03 — Lead Capture Router",
+  "nodes": [
+    {
+      "id": "cc1a2b3d-0001-4000-8000-000000000001",
+      "name": "Multi-Source Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "lead-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "lead-{{client_id}}"
+    },
+    {
+      "id": "cc1a2b3d-0001-4000-8000-000000000002",
+      "name": "Parse Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "source", "value": "={{$json.source}}" },
+            { "name": "name", "value": "={{$json.name}}" },
+            { "name": "phone", "value": "={{$json.phone}}" },
+            { "name": "email", "value": "={{$json.email}}" },
+            { "name": "message", "value": "={{$json.message}}" },
+            { "name": "lead_ref", "value": "={{$json.lead_id || $json.id}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cc1a2b3d-0001-4000-8000-000000000003",
+      "name": "Bifrost — Qualify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "qwen-2.5-72b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Score lead from 1-10. Return JSON: {\\\"score\\\":N,\\\"intent\\\":\\\"\\\",\\\"urgency\\\":\\\"high/medium/low\\\"}\"},{\"role\":\"user\",\"content\":\"Lead from {{source}}: {{name}}, {{message}}\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cc1a2b3d-0001-4000-8000-000000000004",
+      "name": "Twenty CRM — Create",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{crm_url}}/rest/v1/leads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{crm_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "={{name}}" },
+            { "name": "phone", "value": "={{phone}}" },
+            { "name": "email", "value": "={{email}}" },
+            { "name": "source", "value": "={{source}}" },
+            { "name": "score", "value": "={{$node['Bifrost — Qualify'].json.choices[0].message.content.score}}" },
+            { "name": "status", "value": "=New" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cc1a2b3d-0001-4000-8000-000000000005",
+      "name": "Mem0 — Remember Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.30.0.35:8000/memory/{{phone}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{mem0_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messages", "value": "=New lead from {{source}}" },
+            { "name": "user_id", "value": "={{phone}}" },
+            { "name": "metadata", "value": "={\"source\":\"{{source}}\",\"score\":\"{{$node['Bifrost — Qualify'].json.choices[0].message.content.score}}\",\"urgency\":\"{{$node['Bifrost — Qualify'].json.choices[0].message.content.urgency}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Multi-Source Webhook": {
+      "main": [[ { "node": "Parse Lead", "type": "main", "index": 0 } ]]
+    },
+    "Parse Lead": {
+      "main": [[ { "node": "Bifrost — Qualify", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Qualify": {
+      "main": [[ { "node": "Twenty CRM — Create", "type": "main", "index": 0 } ]]
+    },
+    "Twenty CRM — Create": {
+      "main": [[ { "node": "Mem0 — Remember Lead", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["marketing", "leads"],
+  "versionId": "1.0.0"
+}

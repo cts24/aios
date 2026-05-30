@@ -1,0 +1,137 @@
+{
+  "name": "05 — Outbound Lead Followup",
+  "nodes": [
+    {
+      "id": "l1a2b3c4-0001-4000-8000-000000000001",
+      "name": "New Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "outbound-lead-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "outbound-lead-{{client_id}}"
+    },
+    {
+      "id": "l1a2b3c4-0001-4000-8000-000000000002",
+      "name": "Parse Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "lead_name", "value": "={{$json.name}}" },
+            { "name": "lead_phone", "value": "={{$json.phone}}" },
+            { "name": "lead_source", "value": "={{$json.source}}" },
+            { "name": "lead_id", "value": "={{$json.lead_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "l1a2b3c4-0001-4000-8000-000000000003",
+      "name": "Bifrost — Draft Script",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "mistral-7b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Generate a 60-second outbound call script. Language: {{language}}. Business: {{company_name}}. Personalize for lead.\"},{\"role\":\"user\",\"content\":\"Lead: {{lead_name}} from {{lead_source}}\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "l1a2b3c4-0001-4000-8000-000000000004",
+      "name": "Dograh — Outbound Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{dograh_url}}/api/outbound/call",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{dograh_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "phone", "value": "={{lead_phone}}" },
+            { "name": "script", "value": "={{$node['Bifrost — Draft Script'].json.choices[0].message.content}}" },
+            { "name": "agent_id", "value": "=lead-followup-{{client_id}}" },
+            { "name": "webhook_url", "value": "={{webhook_base}}/outbound-result-{{client_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "l1a2b3c4-0001-4000-8000-000000000005",
+      "name": "Twenty CRM — Update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "parameters": {
+        "method": "PATCH",
+        "url": "{{crm_url}}/rest/v1/leads/{{lead_id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{crm_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "status", "value": "Contacted" },
+            { "name": "called_at", "value": "={{new Date().toISOString()}}" },
+            { "name": "notes", "value": "=Outbound followup call via Dograh" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "New Lead Webhook": {
+      "main": [[ { "node": "Parse Lead", "type": "main", "index": 0 } ]]
+    },
+    "Parse Lead": {
+      "main": [[ { "node": "Bifrost — Draft Script", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Draft Script": {
+      "main": [[ { "node": "Dograh — Outbound Call", "type": "main", "index": 0 } ]]
+    },
+    "Dograh — Outbound Call": {
+      "main": [[ { "node": "Twenty CRM — Update", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["callcentre", "outbound"],
+  "versionId": "1.0.0"
+}

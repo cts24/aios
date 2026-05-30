@@ -1,0 +1,27 @@
+server:
+  port: 8080
+  host: 0.0.0.0
+
+asterisk:
+  host: 10.50.0.10
+  port: 5038
+  username: ${DOGRAH_AMI_USER}
+  password: ${DOGRAH_AMI_SECRET}
+
+llm:
+  provider: bifrost
+  endpoint: http://10.20.0.10:4000/v1
+  model: qwen-2.5-72b
+  fallback_model: mistral-7b
+
+stt:
+  provider: whisper
+  endpoint: http://10.50.0.30:9000
+
+tts:
+  provider: kokoro
+  endpoint: http://10.50.0.40:5000
+
+mcp:
+  enabled: true
+  server: http://10.70.0.90:3100

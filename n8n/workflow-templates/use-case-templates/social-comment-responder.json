@@ -1,0 +1,103 @@
+{
+  "name": "02 — Social Comment Responder",
+  "nodes": [
+    {
+      "id": "bb1a2c3d-0001-4000-8000-000000000001",
+      "name": "Meta Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "social-comment-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "social-comment-{{client_id}}"
+    },
+    {
+      "id": "bb1a2c3d-0001-4000-8000-000000000002",
+      "name": "Parse Comment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "comment_id", "value": "={{$json.entry[0].changes[0].value.comment_id}}" },
+            { "name": "comment_text", "value": "={{$json.entry[0].changes[0].value.message}}" },
+            { "name": "post_id", "value": "={{$json.entry[0].changes[0].value.post_id}}" },
+            { "name": "user_name", "value": "={{$json.entry[0].changes[0].value.from.name}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bb1a2c3d-0001-4000-8000-000000000003",
+      "name": "Bifrost — Generate Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "mistral-7b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Reply to social media comment. Be helpful, professional, on-brand. If complaint, apologize and offer help. Language: {{language}}\"},{\"role\":\"user\",\"content\":\"Comment from {{user_name}}: {{comment_text}}\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bb1a2c3d-0001-4000-8000-000000000004",
+      "name": "Meta API — Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{comment_id}}/replies",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{meta_access_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "message", "value": "={{$node['Bifrost — Generate Reply'].json.choices[0].message.content}}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Meta Webhook": {
+      "main": [[ { "node": "Parse Comment", "type": "main", "index": 0 } ]]
+    },
+    "Parse Comment": {
+      "main": [[ { "node": "Bifrost — Generate Reply", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Generate Reply": {
+      "main": [[ { "node": "Meta API — Reply", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["marketing", "social"],
+  "versionId": "1.0.0"
+}

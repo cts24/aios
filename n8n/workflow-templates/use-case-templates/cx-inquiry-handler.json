@@ -1,0 +1,129 @@
+{
+  "name": "02 — CX Inquiry Handler",
+  "nodes": [
+    {
+      "id": "p1a2b3c4-0001-4000-8000-000000000001",
+      "name": "Inquiry Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "cx-inquiry-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "cx-inquiry-{{client_id}}"
+    },
+    {
+      "id": "p1a2b3c4-0001-4000-8000-000000000002",
+      "name": "Parse Inquiry",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "customer_id", "value": "={{$json.from}}" },
+            { "name": "query", "value": "={{$json.text}}" },
+            { "name": "channel", "value": "={{$json.channel}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "p1a2b3c4-0001-4000-8000-000000000003",
+      "name": "Qdrant — Search Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.30.0.20:6333/collections/{{collection_id}}/points/search",
+        "authentication": "none",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "vector", "value": [] },
+            { "name": "limit", "value": 5 },
+            { "name": "with_payload", "value": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "p1a2b3c4-0001-4000-8000-000000000004",
+      "name": "Bifrost — Generate Quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "qwen-2.5-72b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"You are a sales assistant. Answer product inquiries with info + pricing from context. Language: {{language}}\"},{\"role\":\"user\",\"content\":\"Context: {{$node['Qdrant — Search Products'].json.result[0].payload.text}}\\n\\nQuery: {{query}}\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "p1a2b3c4-0001-4000-8000-000000000005",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{channel === 'whatsapp' ? 'https://graph.facebook.com/v21.0/'+whatsapp_phone_id+'/messages' : ''}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{channel === 'whatsapp' ? whatsapp_token : ''}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{customer_id}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"{{$node['Bifrost — Generate Quote'].json.choices[0].message.content}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Inquiry Trigger": {
+      "main": [[ { "node": "Parse Inquiry", "type": "main", "index": 0 } ]]
+    },
+    "Parse Inquiry": {
+      "main": [[ { "node": "Qdrant — Search Products", "type": "main", "index": 0 } ]]
+    },
+    "Qdrant — Search Products": {
+      "main": [[ { "node": "Bifrost — Generate Quote", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Generate Quote": {
+      "main": [[ { "node": "Send Reply", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["cx", "inquiry"],
+  "versionId": "1.0.0"
+}

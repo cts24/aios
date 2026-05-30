@@ -1,0 +1,110 @@
+{
+  "name": "02 — Call FAQ Agent",
+  "nodes": [
+    {
+      "id": "i1a2b3c4-0001-4000-8000-000000000001",
+      "name": "Dograh FAQ Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "call-faq-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "call-faq-{{client_id}}"
+    },
+    {
+      "id": "i1a2b3c4-0001-4000-8000-000000000002",
+      "name": "Parse Query",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "query", "value": "={{$json.text}}" },
+            { "name": "caller_id", "value": "={{$json.caller_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "i1a2b3c4-0001-4000-8000-000000000003",
+      "name": "Qdrant — Search FAQ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.30.0.20:6333/collections/{{collection_id}}/points/search",
+        "authentication": "none",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "vector", "value": [] },
+            { "name": "limit", "value": 3 },
+            { "name": "with_payload", "value": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "i1a2b3c4-0001-4000-8000-000000000004",
+      "name": "Bifrost — LLM Answer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "qwen-2.5-72b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Answer based ONLY on context. Be concise. Language: {{language}}\"},{\"role\":\"user\",\"content\":\"Context: {{$node['Qdrant — Search FAQ'].json.result[0].payload.text}}\\n\\nQuery: {{query}}\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "i1a2b3c4-0001-4000-8000-000000000005",
+      "name": "Return to Dograh",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"response\":\"{{$node['Bifrost — LLM Answer'].json.choices[0].message.content}}\",\"caller_id\":\"{{caller_id}}\"}"
+      }
+    }
+  ],
+  "connections": {
+    "Dograh FAQ Request": {
+      "main": [[ { "node": "Parse Query", "type": "main", "index": 0 } ]]
+    },
+    "Parse Query": {
+      "main": [[ { "node": "Qdrant — Search FAQ", "type": "main", "index": 0 } ]]
+    },
+    "Qdrant — Search FAQ": {
+      "main": [[ { "node": "Bifrost — LLM Answer", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — LLM Answer": {
+      "main": [[ { "node": "Return to Dograh", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["callcentre", "faq"],
+  "versionId": "1.0.0"
+}

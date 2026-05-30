@@ -1,0 +1,53 @@
+mqtt:
+  enabled: true
+  host: 10.55.0.30
+  port: 1883
+  user: ${FRIGATE_MQTT_USER}
+  password: ${FRIGATE_MQTT_PASSWORD}
+
+cameras:
+  office-cam-1:
+    ffmpeg:
+      inputs:
+        - path: rtsp://${CAM1_USER}:${CAM1_PASSWORD}@office-public-ip:8554/stream1
+          roles:
+            - detect
+            - record
+    detect:
+      width: 1280
+      height: 720
+      fps: 5
+
+  office-cam-2:
+    ffmpeg:
+      inputs:
+        - path: rtsp://${CAM2_USER}:${CAM2_PASSWORD}@office-public-ip:8554/stream2
+          roles:
+            - detect
+            - record
+    detect:
+      width: 1280
+      height: 720
+      fps: 5
+
+detect:
+  enabled: true
+  fps: 5
+
+record:
+  enabled: true
+  retain_days: 7
+  events:
+    pre_capture: 5
+    post_capture: 5
+
+objects:
+  track:
+    - person
+    - car
+    - animal
+
+snapshots:
+  enabled: true
+  timestamp: true
+  bounding_box: true

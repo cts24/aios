@@ -1,0 +1,157 @@
+{
+  "name": "04 — Leave Approval Handler",
+  "nodes": [
+    {
+      "id": "e1f2a3b4-0001-4000-8000-000000000001",
+      "name": "WhatsApp Webhook (Manager)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "leave-approve-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "leave-approve-{{client_id}}"
+    },
+    {
+      "id": "e1f2a3b4-0001-4000-8000-000000000002",
+      "name": "Parse Manager Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "manager_phone", "value": "={{$json.body.from}}" },
+            { "name": "decision", "value": "={{$json.body.text | lower}}" },
+            { "name": "employee_phone", "value": "={{$json.body.context.employee_phone}}" },
+            { "name": "leave_date", "value": "={{$json.body.context.date}}" },
+            { "name": "leave_type", "value": "={{$json.body.context.type}}" },
+            { "name": "leave_reason", "value": "={{$json.body.context.reason}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e1f2a3b4-0001-4000-8000-000000000003",
+      "name": "Check Decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [680, 300],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json.decision}}",
+        "routingRules": [
+          { "value": "yes", "outputKey": "approved" },
+          { "value": "no", "outputKey": "rejected" }
+        ]
+      }
+    },
+    {
+      "id": "e1f2a3b4-0001-4000-8000-000000000004",
+      "name": "ERPNext — Create Leave App",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "{{erp_url}}/api/resource/Leave Application",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "data", "value": "={\"employee\":\"{{employee_phone}}\",\"leave_type\":\"{{leave_type}}\",\"from_date\":\"{{leave_date}}\",\"to_date\":\"{{leave_date}}\",\"reason\":\"{{leave_reason}}\",\"status\":\"Approved\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e1f2a3b4-0001-4000-8000-000000000005",
+      "name": "WhatsApp — Approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{employee_phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"✅ Leave approved for {{leave_date}}. Enjoy!\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e1f2a3b4-0001-4000-8000-000000000006",
+      "name": "WhatsApp — Rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{employee_phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"❌ Leave request for {{leave_date}} was not approved.\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook (Manager)": {
+      "main": [[ { "node": "Parse Manager Reply", "type": "main", "index": 0 } ]]
+    },
+    "Parse Manager Reply": {
+      "main": [[ { "node": "Check Decision", "type": "main", "index": 0 } ]]
+    },
+    "Check Decision": {
+      "main": [
+        [ { "node": "ERPNext — Create Leave App", "type": "main", "index": 0 } ],
+        [ { "node": "WhatsApp — Rejected", "type": "main", "index": 0 } ]
+      ]
+    },
+    "ERPNext — Create Leave App": {
+      "main": [[ { "node": "WhatsApp — Approved", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["hrms", "leave"],
+  "versionId": "1.0.0"
+}

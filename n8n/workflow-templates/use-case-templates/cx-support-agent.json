@@ -1,0 +1,175 @@
+{
+  "name": "03 — CX Support Agent",
+  "nodes": [
+    {
+      "id": "q1a2b3c4-0001-4000-8000-000000000001",
+      "name": "Support Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "cx-support-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "cx-support-{{client_id}}"
+    },
+    {
+      "id": "q1a2b3c4-0001-4000-8000-000000000002",
+      "name": "Parse",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "customer_id", "value": "={{$json.from}}" },
+            { "name": "issue", "value": "={{$json.text}}" },
+            { "name": "channel", "value": "={{$json.channel}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "q1a2b3c4-0001-4000-8000-000000000003",
+      "name": "Qdrant — Search FAQ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.30.0.20:6333/collections/{{collection_id}}/points/search",
+        "authentication": "none",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "vector", "value": [] },
+            { "name": "limit", "value": 3 },
+            { "name": "with_payload", "value": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "q1a2b3c4-0001-4000-8000-000000000004",
+      "name": "Bifrost — Answer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "qwen-2.5-72b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Answer support query from context. If uncertain, create a ticket.\"},{\"role\":\"user\",\"content\":\"Context: {{$node['Qdrant — Search FAQ'].json.result[0].payload.text}}\\n\\nIssue: {{issue}}\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "q1a2b3c4-0001-4000-8000-000000000005",
+      "name": "Check Resolved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{$node['Bifrost — Answer'].json.choices[0].message.content}}", "operation": "contains", "value2": "I'm not sure" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "q1a2b3c4-0001-4000-8000-000000000006",
+      "name": "ERPNext — Create Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "{{erp_url}}/api/resource/Issue",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "data", "value": "={\"subject\":\"{{issue | truncate(100)}}\",\"customer\":\"{{customer_id}}\",\"description\":\"{{issue}}\",\"status\":\"Open\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "q1a2b3c4-0001-4000-8000-000000000007",
+      "name": "Reply or Escalate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{customer_id}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"{{$node['Bifrost — Answer'].json.choices[0].message.content}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Support Trigger": {
+      "main": [[ { "node": "Parse", "type": "main", "index": 0 } ]]
+    },
+    "Parse": {
+      "main": [[ { "node": "Qdrant — Search FAQ", "type": "main", "index": 0 } ]]
+    },
+    "Qdrant — Search FAQ": {
+      "main": [[ { "node": "Bifrost — Answer", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Answer": {
+      "main": [[ { "node": "Check Resolved", "type": "main", "index": 0 } ]]
+    },
+    "Check Resolved": {
+      "main": [
+        [ { "node": "ERPNext — Create Ticket", "type": "main", "index": 0 } ],
+        [ { "node": "Reply or Escalate", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["cx", "support"],
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,116 @@
+{
+  "name": "01 — Social Post Scheduler",
+  "nodes": [
+    {
+      "id": "aa1b2c3d-0001-4000-8000-000000000001",
+      "name": "Cron Mon/Wed/Fri 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "cronExpression": { "cronExpression": "0 9 * * 1,3,5" }
+        }
+      }
+    },
+    {
+      "id": "aa1b2c3d-0001-4000-8000-000000000002",
+      "name": "Bifrost — Claude Generate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "claude-4-sonnet" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Generate 1 social media post for {{company_name}}. Include: engaging caption, 3-5 hashtags, call-to-action. Business type: {{industry}}. Language: {{language}}. Tone: professional yet friendly.\"},{\"role\":\"user\",\"content\":\"Generate today's post. Relevant topics: {{industry}} tips, customer success, product highlights.\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aa1b2c3d-0001-4000-8000-000000000003",
+      "name": "Meta API — Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{facebook_page_id}}/feed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{meta_access_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "message", "value": "={{$node['Bifrost — Claude Generate'].json.choices[0].message.content}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aa1b2c3d-0001-4000-8000-000000000004",
+      "name": "Langfuse Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.60.0.10:3000/api/public/observations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{langfuse_secret_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "social-post" },
+            { "name": "type", "value": "GENERATION" },
+            { "name": "input", "value": "=generate post" },
+            { "name": "output", "value": "={{$node['Meta API — Publish'].json.id}}" },
+            { "name": "model", "value": "claude-4-sonnet" },
+            { "name": "projectId", "value": "={{client_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron Mon/Wed/Fri 9am": {
+      "main": [[ { "node": "Bifrost — Claude Generate", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Claude Generate": {
+      "main": [[ { "node": "Meta API — Publish", "type": "main", "index": 0 } ]]
+    },
+    "Meta API — Publish": {
+      "main": [[ { "node": "Langfuse Log", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["marketing", "social"],
+  "versionId": "1.0.0"
+}

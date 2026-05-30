@@ -1,0 +1,116 @@
+{
+  "name": "01 — CX Main Router",
+  "nodes": [
+    {
+      "id": "o1a2b3c4-0001-4000-8000-000000000001",
+      "name": "Multi-Channel Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "cx-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "cx-{{client_id}}"
+    },
+    {
+      "id": "o1a2b3c4-0001-4000-8000-000000000002",
+      "name": "Parse Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "channel", "value": "={{$json.channel}}" },
+            { "name": "customer_id", "value": "={{$json.from}}" },
+            { "name": "message", "value": "={{$json.text}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "o1a2b3c4-0001-4000-8000-000000000003",
+      "name": "Mem0 — Get Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "http://10.30.0.35:8000/memory/{{customer_id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{mem0_key}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "o1a2b3c4-0001-4000-8000-000000000004",
+      "name": "Bifrost — Intent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "mistral-7b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Classify: inquiry | support | complaint | booking | other\"},{\"role\":\"user\",\"content\":$json.message}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "o1a2b3c4-0001-4000-8000-000000000005",
+      "name": "Route",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1120, 300],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json.choices[0].message.content | lower}}",
+        "routingRules": [
+          { "value": "inquiry", "outputKey": "inquiry" },
+          { "value": "support", "outputKey": "support" },
+          { "value": "complaint", "outputKey": "complaint" },
+          { "value": "booking", "outputKey": "booking" }
+        ]
+      }
+    }
+  ],
+  "connections": {
+    "Multi-Channel Webhook": {
+      "main": [[ { "node": "Parse Input", "type": "main", "index": 0 } ]]
+    },
+    "Parse Input": {
+      "main": [[ { "node": "Mem0 — Get Customer", "type": "main", "index": 0 } ]]
+    },
+    "Mem0 — Get Customer": {
+      "main": [[ { "node": "Bifrost — Intent", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Intent": {
+      "main": [[ { "node": "Route", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["cx", "router"],
+  "versionId": "1.0.0"
+}

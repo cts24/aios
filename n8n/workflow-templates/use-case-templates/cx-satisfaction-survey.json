@@ -1,0 +1,111 @@
+{
+  "name": "06 — CX Satisfaction Survey",
+  "nodes": [
+    {
+      "id": "t1a2b3c4-0001-4000-8000-000000000001",
+      "name": "Cron Monthly 1st",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "cronExpression": { "cronExpression": "0 9 1 * *" }
+        }
+      }
+    },
+    {
+      "id": "t1a2b3c4-0001-4000-8000-000000000002",
+      "name": "Supabase — Active Customers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "{{supabase_url}}/rest/v1/mem0?select=user_id&last_interaction=gt.{{60_days_ago}}&limit=200",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{supabase_key}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "t1a2b3c4-0001-4000-8000-000000000003",
+      "name": "WhatsApp — NPS Survey",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{$json.user_id}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"📊 How likely are you to recommend {{company_name}} to a friend? Rate 0-10. (0=Not likely, 10=Extremely likely)\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "t1a2b3c4-0001-4000-8000-000000000004",
+      "name": "Log Survey",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.60.0.10:3000/api/public/observations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{langfuse_secret_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "nps-survey" },
+            { "name": "type", "value": "GENERATION" },
+            { "name": "input", "value": "={{$node['Supabase — Active Customers'].json.data.length}}" },
+            { "name": "output", "value": "=NPS survey sent" },
+            { "name": "projectId", "value": "={{client_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron Monthly 1st": {
+      "main": [[ { "node": "Supabase — Active Customers", "type": "main", "index": 0 } ]]
+    },
+    "Supabase — Active Customers": {
+      "main": [[ { "node": "WhatsApp — NPS Survey", "type": "main", "index": 0 } ]]
+    },
+    "WhatsApp — NPS Survey": {
+      "main": [[ { "node": "Log Survey", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["cx", "survey"],
+  "versionId": "1.0.0"
+}

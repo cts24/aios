@@ -1,0 +1,113 @@
+{
+  "name": "07 — Content Generator",
+  "nodes": [
+    {
+      "id": "gg1a2b3c-0001-4000-8000-000000000001",
+      "name": "Cron Weekly Mon 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "cronExpression": { "cronExpression": "0 8 * * 1" }
+        }
+      }
+    },
+    {
+      "id": "gg1a2b3c-0001-4000-8000-000000000002",
+      "name": "Bifrost — Claude Blog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "claude-4-sonnet" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Write an SEO-optimized blog post (800-1000 words) for {{company_name}}. Industry: {{industry}}. Target keywords: {{keywords}}. Include H2 headings, intro, body, conclusion, meta description. Language: {{language}}. Write in {{tone}} tone.\"},{\"role\":\"user\",\"content\":\"Topic: {{topic}}. Publish to company blog.\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "gg1a2b3c-0001-4000-8000-000000000003",
+      "name": "Website API — Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{website_api_url}}/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{website_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "title", "value": "={{$node['Bifrost — Claude Blog'].json.choices[0].message.content.split('\\n')[0]}}" },
+            { "name": "content", "value": "={{$node['Bifrost — Claude Blog'].json.choices[0].message.content}}" },
+            { "name": "status", "value": "publish" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "gg1a2b3c-0001-4000-8000-000000000004",
+      "name": "Meta API — Share Blog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{facebook_page_id}}/feed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{meta_access_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "message", "value": "=New blog post! Check it out: {{website_url}}/blog/{{$node['Website API — Publish'].json.slug}}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron Weekly Mon 8am": {
+      "main": [[ { "node": "Bifrost — Claude Blog", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Claude Blog": {
+      "main": [[ { "node": "Website API — Publish", "type": "main", "index": 0 } ]]
+    },
+    "Website API — Publish": {
+      "main": [[ { "node": "Meta API — Share Blog", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["marketing", "content"],
+  "versionId": "1.0.0"
+}

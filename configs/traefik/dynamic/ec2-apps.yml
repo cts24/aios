@@ -1,0 +1,198 @@
+# Cross-EC2 routing to EC2 #2 (FOSS Apps)
+# EC2 #2 private IP: 10.0.2.10
+
+http:
+  routers:
+    keycloak:
+      rule: "Host(`keycloak.aios.local`)"
+      entryPoints:
+        - websecure
+      service: keycloak
+      tls:
+        certResolver: letsencrypt-staging
+
+    vault:
+      rule: "Host(`vault.aios.local`)"
+      entryPoints:
+        - websecure
+      service: vault
+      tls:
+        certResolver: letsencrypt-staging
+
+    paperclip:
+      rule: "Host(`paperclip.aios.local`)"
+      entryPoints:
+        - websecure
+      service: paperclip
+      tls:
+        certResolver: letsencrypt-staging
+
+    odoo:
+      rule: "Host(`odoo.aios.local`)"
+      entryPoints:
+        - websecure
+      service: odoo
+      tls:
+        certResolver: letsencrypt-staging
+
+    erpnext:
+      rule: "Host(`erpnext.aios.local`)"
+      entryPoints:
+        - websecure
+      service: erpnext
+      tls:
+        certResolver: letsencrypt-staging
+
+    twenty-crm:
+      rule: "Host(`crm.aios.local`)"
+      entryPoints:
+        - websecure
+      service: twenty-crm
+      tls:
+        certResolver: letsencrypt-staging
+
+    suitecrm:
+      rule: "Host(`suitecrm.aios.local`)"
+      entryPoints:
+        - websecure
+      service: suitecrm
+      tls:
+        certResolver: letsencrypt-staging
+
+    calcom:
+      rule: "Host(`calcom.aios.local`)"
+      entryPoints:
+        - websecure
+      service: calcom
+      tls:
+        certResolver: letsencrypt-staging
+
+    paperless:
+      rule: "Host(`paperless.aios.local`)"
+      entryPoints:
+        - websecure
+      service: paperless
+      tls:
+        certResolver: letsencrypt-staging
+
+    docuseal:
+      rule: "Host(`docuseal.aios.local`)"
+      entryPoints:
+        - websecure
+      service: docuseal
+      tls:
+        certResolver: letsencrypt-staging
+
+    planka:
+      rule: "Host(`planka.aios.local`)"
+      entryPoints:
+        - websecure
+      service: planka
+      tls:
+        certResolver: letsencrypt-staging
+
+    rocketchat:
+      rule: "Host(`chat.aios.local`)"
+      entryPoints:
+        - websecure
+      service: rocketchat
+      tls:
+        certResolver: letsencrypt-staging
+
+    metabase:
+      rule: "Host(`metabase.aios.local`)"
+      entryPoints:
+        - websecure
+      service: metabase
+      tls:
+        certResolver: letsencrypt-staging
+
+    issabel:
+      rule: "Host(`issabel.aios.local`)"
+      entryPoints:
+        - websecure
+      service: issabel
+      tls:
+        certResolver: letsencrypt-staging
+
+    central-mcp:
+      rule: "Host(`mcp.aios.local`)"
+      entryPoints:
+        - websecure
+      service: central-mcp
+      tls:
+        certResolver: letsencrypt-staging
+
+    frappe-lms:
+      rule: "Host(`lms.aios.local`)"
+      entryPoints:
+        - websecure
+      service: frappe-lms
+      tls:
+        certResolver: letsencrypt-staging
+
+  services:
+    keycloak:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:8080"
+    vault:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:8200"
+    paperclip:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:3002"
+    odoo:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:8069"
+    erpnext:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:8001"
+    twenty-crm:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:3003"
+    suitecrm:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:8081"
+    calcom:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:3004"
+    paperless:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:8082"
+    docuseal:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:3005"
+    planka:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:3006"
+    rocketchat:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:3007"
+    metabase:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:3008"
+    issabel:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:8083"
+    central-mcp:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:3100"
+    frappe-lms:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.2.10:8002"

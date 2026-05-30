@@ -1,0 +1,59 @@
+---
+- name: Setup EC2 for AIOS
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+  roles:
+    - docker
+    - ec2-setup
+    - aios-directories
+
+  tasks:
+    - name: Check if git repo exists
+      stat:
+        path: /aios/.git
+      register: git_dir
+
+    - name: Clone AIOS repository
+      git:
+        repo: git@github.com:your-org/aios.git
+        dest: /aios
+        version: main
+      when: not git_dir.stat.exists
+
+    - name: Copy env file
+      copy:
+        src: "{{ env_file }}"
+        dest: /aios/.env
+        owner: ubuntu
+        group: ubuntu
+        mode: "0600"
+
+    - name: Create Docker networks
+      community.docker.docker_network:
+        name: "{{ item }}"
+        driver: bridge
+      loop:
+        - dmz-net
+        - ai-net
+        - data-net
+        - voice-net
+        - vision-net
+        - monitoring-net
+      when: role == "ai"
+
+    - name: Deploy AI stack
+      community.docker.docker_compose_v2:
+        project_src: /aios
+        files:
+          - "{{ compose_file }}"
+        state: present
+        pull: always
+      when: compose_file is defined

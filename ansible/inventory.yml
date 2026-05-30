@@ -1,0 +1,20 @@
+all:
+  children:
+    ec2_ai:
+      hosts:
+        aios-ec2-1:
+          ansible_host: 10.0.1.10
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ~/.ssh/aios-ec2.pem
+          role: ai
+          compose_file: docker-compose-aios.yml
+          env_file: .env.aios
+    ec2_apps:
+      hosts:
+        aios-ec2-2:
+          ansible_host: 10.0.2.10
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ~/.ssh/aios-ec2.pem
+          role: apps
+          compose_file: docker-compose-apps.yml
+          env_file: .env.apps

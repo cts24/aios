@@ -1,0 +1,108 @@
+{
+  "name": "04 — CX Retention Engine",
+  "nodes": [
+    {
+      "id": "r1a2b3c4-0001-4000-8000-000000000001",
+      "name": "Cron Daily 10am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "cronExpression": { "cronExpression": "0 10 * * *" }
+        }
+      }
+    },
+    {
+      "id": "r1a2b3c4-0001-4000-8000-000000000002",
+      "name": "Supabase — Silent Customers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "{{supabase_url}}/rest/v1/mem0?select=user_id,last_interaction&last_interaction=lt.{{30_days_ago}}&limit=50",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{supabase_key}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "r1a2b3c4-0001-4000-8000-000000000003",
+      "name": "Bifrost — Draft Re-Engage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "mistral-7b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Draft a friendly re-engagement WhatsApp message. Short, warm, no hard sell. Language: {{language}}\"},{\"role\":\"user\",\"content\":\"Customer hasn't contacted us in 30+ days. Business: {{company_name}}\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "r1a2b3c4-0001-4000-8000-000000000004",
+      "name": "WhatsApp — Batch Re-Engage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{$json.user_id}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"{{$node['Bifrost — Draft Re-Engage'].json.choices[0].message.content}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron Daily 10am": {
+      "main": [[ { "node": "Supabase — Silent Customers", "type": "main", "index": 0 } ]]
+    },
+    "Supabase — Silent Customers": {
+      "main": [[ { "node": "Bifrost — Draft Re-Engage", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Draft Re-Engage": {
+      "main": [[ { "node": "WhatsApp — Batch Re-Engage", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["cx", "retention"],
+  "versionId": "1.0.0"
+}

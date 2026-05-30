@@ -1,0 +1,304 @@
+{
+  "name": "AI HRMS — Main Orchestrator",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "hrms-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "hrms-{{client_id}}"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
+      "name": "Set Client Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "client_id", "value": "={{$node.Webhook.json.headers['x-client-id']}}" },
+            { "name": "employee_phone", "value": "={{$node.Webhook.json.body.from}}" },
+            { "name": "message", "value": "={{$node.Webhook.json.body.text}}" },
+            { "name": "media", "value": "={{$node.Webhook.json.body.media_url}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000003",
+      "name": "Bifrost — Intent Detection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" },
+            { "name": "X-Client-Id", "value": "={{$json.client_id}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "mistral-7b" },
+            { "name": "messages", "value": "[{\"role\":\"system\",\"content\":\"Classify HR intent: leave_request | balance_query | payslip | policy | attendance | payroll | other\"},{\"role\":\"user\",\"content\":\"{{message}}\"}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000004",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [900, 300],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json.choices[0].message.content | lower}}",
+        "routingRules": [
+          { "value": "leave_request", "outputKey": "leave" },
+          { "value": "balance_query", "outputKey": "balance" },
+          { "value": "payslip", "outputKey": "payslip" },
+          { "value": "policy", "outputKey": "policy" },
+          { "value": "attendance", "outputKey": "attendance" },
+          { "value": "payroll", "outputKey": "payroll" }
+        ]
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
+      "name": "Qdrant — Policy Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 500],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.30.0.20:6333/collections/{{collection_id}}/points/search",
+        "authentication": "none",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "vector", "value": [] },
+            { "name": "limit", "value": 3 },
+            { "name": "with_payload", "value": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000006",
+      "name": "ERPNext — Employee Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200],
+      "parameters": {
+        "method": "GET",
+        "url": "{{erp_url}}/api/resource/Employee?filters={\"cell_number\":\"{{employee_phone}}\"}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000007",
+      "name": "Mem0 — Read Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 350],
+      "parameters": {
+        "method": "GET",
+        "url": "http://10.30.0.35:8000/memory/{{employee_phone}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{mem0_key}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000008",
+      "name": "Bifrost — Generate Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" },
+            { "name": "X-Client-Id", "value": "={{$json.client_id}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "qwen-2.5-72b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"You are {{agent_name}}, an HR assistant. Reply professionally in {{language}}.\"},{\"role\":\"user\",\"content\":$json.message}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000009",
+      "name": "Mem0 — Write Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.30.0.35:8000/memory/{{employee_phone}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{mem0_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messages", "value": "={{$json.choices[0].message.content}}" },
+            { "name": "user_id", "value": "={{$json.employee_phone}}" },
+            { "name": "metadata", "value": "={\"client_id\":\"{{client_id}}\",\"intent\":\"{{$node['Bifrost — Intent Detection'].json.choices[0].message.content}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000010",
+      "name": "Langfuse — Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.60.0.10:3000/api/public/observations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{langfuse_secret_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "hrms-query" },
+            { "name": "type", "value": "GENERATION" },
+            { "name": "input", "value": "={{$node['WhatsApp Webhook'].json.body.text}}" },
+            { "name": "output", "value": "={{$node['Bifrost — Generate Reply'].json.choices[0].message.content}}" },
+            { "name": "model", "value": "qwen-2.5-72b" },
+            { "name": "projectId", "value": "={{$node['Set Client Context'].json.client_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000011",
+      "name": "WhatsApp Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{$node['Set Client Context'].json.employee_phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"{{$node['Bifrost — Generate Reply'].json.choices[0].message.content}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook": {
+      "main": [[ { "node": "Set Client Context", "type": "main", "index": 0 } ]]
+    },
+    "Set Client Context": {
+      "main": [[ { "node": "Bifrost — Intent Detection", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Intent Detection": {
+      "main": [[ { "node": "Route by Intent", "type": "main", "index": 0 } ]]
+    },
+    "Route by Intent": {
+      "main": [
+        [ { "node": "ERPNext — Employee Query", "type": "main", "index": 0 } ],
+        [ { "node": "ERPNext — Employee Query", "type": "main", "index": 0 } ],
+        [ { "node": "ERPNext — Employee Query", "type": "main", "index": 0 } ],
+        [ { "node": "Qdrant — Policy Search", "type": "main", "index": 0 } ],
+        [ { "node": "ERPNext — Employee Query", "type": "main", "index": 0 } ],
+        [ { "node": "ERPNext — Employee Query", "type": "main", "index": 0 } ]
+      ]
+    },
+    "ERPNext — Employee Query": {
+      "main": [[ { "node": "Bifrost — Generate Reply", "type": "main", "index": 0 } ]]
+    },
+    "Qdrant — Policy Search": {
+      "main": [[ { "node": "Mem0 — Read Memory", "type": "main", "index": 0 } ]]
+    },
+    "Mem0 — Read Memory": {
+      "main": [[ { "node": "Bifrost — Generate Reply", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Generate Reply": {
+      "main": [[ { "node": "Mem0 — Write Memory", "type": "main", "index": 0 } ]]
+    },
+    "Mem0 — Write Memory": {
+      "main": [[ { "node": "Langfuse — Log", "type": "main", "index": 0 } ]]
+    },
+    "Langfuse — Log": {
+      "main": [[ { "node": "WhatsApp Reply", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["hrms", "template"],
+  "versionId": "1.0.0"
+}

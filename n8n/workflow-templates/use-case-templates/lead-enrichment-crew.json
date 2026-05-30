@@ -1,0 +1,105 @@
+{
+  "name": "06 — Lead Enrichment (CrewAI)",
+  "nodes": [
+    {
+      "id": "ff1a2b3c-0001-4000-8000-000000000001",
+      "name": "Enrichment Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "lead-enrich-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "lead-enrich-{{client_id}}"
+    },
+    {
+      "id": "ff1a2b3c-0001-4000-8000-000000000002",
+      "name": "Parse",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "lead_id", "value": "={{$json.lead_id}}" },
+            { "name": "company", "value": "={{$json.company || $json.name}}" },
+            { "name": "industry", "value": "={{$json.industry}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ff1a2b3c-0001-4000-8000-000000000003",
+      "name": "CrewAI — Enrich Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.40:3000/api/crew/enrich",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{crewai_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "lead_id", "value": "={{lead_id}}" },
+            { "name": "company", "value": "={{company}}" },
+            { "name": "industry", "value": "={{industry}}" },
+            { "name": "agents", "value": "=['researcher','pain_points','outreach_writer','crm_updater']" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ff1a2b3c-0001-4000-8000-000000000004",
+      "name": "Twenty CRM — Enriched",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "PATCH",
+        "url": "{{crm_url}}/rest/v1/leads/{{lead_id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{crm_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "enriched_data", "value": "={{$node['CrewAI — Enrich Lead'].json.result}}" },
+            { "name": "status", "value": "=Enriched" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Enrichment Trigger": {
+      "main": [[ { "node": "Parse", "type": "main", "index": 0 } ]]
+    },
+    "Parse": {
+      "main": [[ { "node": "CrewAI — Enrich Lead", "type": "main", "index": 0 } ]]
+    },
+    "CrewAI — Enrich Lead": {
+      "main": [[ { "node": "Twenty CRM — Enriched", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["marketing", "enrichment"],
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,158 @@
+{
+  "name": "01 — ZKTeco Attendance Sync",
+  "nodes": [
+    {
+      "id": "b1c2d3e4-0001-4000-8000-000000000001",
+      "name": "Cron 15min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
+        }
+      }
+    },
+    {
+      "id": "b1c2d3e4-0001-4000-8000-000000000002",
+      "name": "ZKTeco API — Pull Logs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "{{zkteco_url}}/api/attendance/logs?since={{date}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{zkteco_token}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b1c2d3e4-0001-4000-8000-000000000004",
+      "name": "ERPNext — Create Attendance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{erp_url}}/api/resource/Attendance",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "data", "value": "={\"employee\":\"{{employee}}\",\"attendance_date\":\"{{log_date}}\",\"status\":\"{{status}}\",\"log_time\":\"{{log_time}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b1c2d3e4-0001-4000-8000-000000000005",
+      "name": "Check Late Arrival",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{$json.status}}", "operation": "equal", "value2": "Late" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b1c2d3e4-0001-4000-8000-000000000006",
+      "name": "WhatsApp — Late Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{manager_phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"⚠️ {{employee_name}} is LATE today ({{log_time}}).\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b1c2d3e4-0001-4000-8000-000000000007",
+      "name": "Log to Langfuse",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.60.0.10:3000/api/public/observations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{langfuse_secret_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "zkteco-sync" },
+            { "name": "type", "value": "GENERATION" },
+            { "name": "input", "value": "={{$node['ZKTeco API — Pull Logs'].json.data}}" },
+            { "name": "output", "value": "={{$json.status}}" },
+            { "name": "model", "value": "zkteco-api" },
+            { "name": "projectId", "value": "={{client_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron 15min": {
+      "main": [[ { "node": "ZKTeco API — Pull Logs", "type": "main", "index": 0 } ]]
+    },
+    "ZKTeco API — Pull Logs": {
+      "main": [[ { "node": "ERPNext — Create Attendance", "type": "main", "index": 0 } ]]
+    },
+    "ERPNext — Create Attendance": {
+      "main": [[ { "node": "Check Late Arrival", "type": "main", "index": 0 } ]]
+    },
+    "Check Late Arrival": {
+      "main": [
+        [ { "node": "WhatsApp — Late Alert", "type": "main", "index": 0 } ],
+        [ { "node": "Log to Langfuse", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["hrms", "attendance"],
+  "versionId": "1.0.0"
+}

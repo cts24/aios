@@ -1,0 +1,164 @@
+{
+  "name": "04 — Call Complaint Handler",
+  "nodes": [
+    {
+      "id": "k1a2b3c4-0001-4000-8000-000000000001",
+      "name": "Dograh Complaint Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "call-complaint-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "call-complaint-{{client_id}}"
+    },
+    {
+      "id": "k1a2b3c4-0001-4000-8000-000000000002",
+      "name": "Parse Complaint",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "text", "value": "={{$json.text}}" },
+            { "name": "caller_id", "value": "={{$json.caller_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "k1a2b3c4-0001-4000-8000-000000000003",
+      "name": "Bifrost — Categorize",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.20.0.10:4000/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{bifrost_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "mistral-7b" },
+            { "name": "messages", "value": "=[{\"role\":\"system\",\"content\":\"Categorize complaint: billing | service | product | other. Urgency: low | medium | high. Return JSON.\"},{\"role\":\"user\",\"content\":$json.text}]" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "k1a2b3c4-0001-4000-8000-000000000004",
+      "name": "ERPNext — Create Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{erp_url}}/api/resource/Issue",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "data", "value": "={\"subject\":\"{{text | truncate(100)}}\",\"customer\":\"{{caller_id}}\",\"description\":\"{{text}}\",\"status\":\"Open\",\"priority\":\"{{$node['Bifrost — Categorize'].json.choices[0].message.content.urgency}}\",\"issue_type\":\"{{$node['Bifrost — Categorize'].json.choices[0].message.content.category}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "k1a2b3c4-0001-4000-8000-000000000005",
+      "name": "Check Urgency",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{$node['Bifrost — Categorize'].json.choices[0].message.content.urgency}}", "operation": "equal", "value2": "high" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "k1a2b3c4-0001-4000-8000-000000000006",
+      "name": "WhatsApp — Escalate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{manager_phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"🔴 Urgent complaint from {{caller_id}}:\\n{{text | truncate(200)}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "k1a2b3c4-0001-4000-8000-000000000007",
+      "name": "Return Resolve",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 400],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"response\":\"Thank you. Your complaint has been logged. We will follow up within 24 hours.\",\"caller_id\":\"{{caller_id}}\",\"ticket_id\":\"{{$node['ERPNext — Create Issue'].json.data.name}}\"}"
+      }
+    }
+  ],
+  "connections": {
+    "Dograh Complaint Request": {
+      "main": [[ { "node": "Parse Complaint", "type": "main", "index": 0 } ]]
+    },
+    "Parse Complaint": {
+      "main": [[ { "node": "Bifrost — Categorize", "type": "main", "index": 0 } ]]
+    },
+    "Bifrost — Categorize": {
+      "main": [[ { "node": "ERPNext — Create Issue", "type": "main", "index": 0 } ]]
+    },
+    "ERPNext — Create Issue": {
+      "main": [[ { "node": "Check Urgency", "type": "main", "index": 0 } ]]
+    },
+    "Check Urgency": {
+      "main": [
+        [ { "node": "WhatsApp — Escalate", "type": "main", "index": 0 } ],
+        [ { "node": "Return Resolve", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["callcentre", "complaint"],
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,108 @@
+{
+  "name": "06 — Outbound Appointment Reminder",
+  "nodes": [
+    {
+      "id": "m1a2b3c4-0001-4000-8000-000000000001",
+      "name": "Cron Daily 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "cronExpression": { "cronExpression": "0 9 * * *" }
+        }
+      }
+    },
+    {
+      "id": "m1a2b3c4-0001-4000-8000-000000000002",
+      "name": "ERPNext — Tomorrow Appts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "{{erp_url}}/api/resource/Appointment?filters={\"appointment_date\":\"{{tomorrow}}\",\"status\":\"Scheduled\"}&fields=[\"name\",\"customer_name\",\"customer_phone\",\"appointment_time\",\"service\"]",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Token {{erp_api_key}}:{{erp_api_secret}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "m1a2b3c4-0001-4000-8000-000000000003",
+      "name": "Dograh — Batch Reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{dograh_url}}/api/outbound/batch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{dograh_api_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "calls", "value": "={{$json.data.map(d => ({phone: d.customer_phone, script: `Hello ${d.customer_name}, this is a reminder for your ${d.service} appointment tomorrow at ${d.appointment_time}. Reply or call us to reschedule.`, agent_id: 'reminder-'+client_id}))}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "m1a2b3c4-0001-4000-8000-000000000004",
+      "name": "Langfuse Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.60.0.10:3000/api/public/observations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{langfuse_secret_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "reminder-batch" },
+            { "name": "type", "value": "GENERATION" },
+            { "name": "input", "value": "={{$node['ERPNext — Tomorrow Appts'].json.data.length}}" },
+            { "name": "output", "value": "={{$node['Dograh — Batch Reminders'].json.status}}" },
+            { "name": "projectId", "value": "={{client_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cron Daily 9am": {
+      "main": [[ { "node": "ERPNext — Tomorrow Appts", "type": "main", "index": 0 } ]]
+    },
+    "ERPNext — Tomorrow Appts": {
+      "main": [[ { "node": "Dograh — Batch Reminders", "type": "main", "index": 0 } ]]
+    },
+    "Dograh — Batch Reminders": {
+      "main": [[ { "node": "Langfuse Log", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["callcentre", "outbound"],
+  "versionId": "1.0.0"
+}

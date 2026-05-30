@@ -1,0 +1,113 @@
+# EC2 #1 internal service routing via Traefik
+
+http:
+  routers:
+    grafana:
+      rule: "Host(`grafana.aios.local`)"
+      entryPoints:
+        - websecure
+      service: grafana
+      tls:
+        certResolver: letsencrypt-staging
+
+    langfuse:
+      rule: "Host(`langfuse.aios.local`)"
+      entryPoints:
+        - websecure
+      service: langfuse
+      tls:
+        certResolver: letsencrypt-staging
+
+    portainer:
+      rule: "Host(`portainer.aios.local`)"
+      entryPoints:
+        - websecure
+      service: portainer
+      tls:
+        certResolver: letsencrypt-staging
+
+    dashy:
+      rule: "Host(`dashy.aios.local`)"
+      entryPoints:
+        - websecure
+      service: dashy
+      tls:
+        certResolver: letsencrypt-staging
+
+    uptime-kuma:
+      rule: "Host(`status.aios.local`)"
+      entryPoints:
+        - websecure
+      service: uptime-kuma
+      tls:
+        certResolver: letsencrypt-staging
+
+    dozzle:
+      rule: "Host(`logs.aios.local`)"
+      entryPoints:
+        - websecure
+      service: dozzle
+      tls:
+        certResolver: letsencrypt-staging
+
+    bifrost:
+      rule: "Host(`bifrost.aios.local`)"
+      entryPoints:
+        - websecure
+      service: bifrost
+      tls:
+        certResolver: letsencrypt-staging
+
+    n8n:
+      rule: "Host(`n8n.aios.local`)"
+      entryPoints:
+        - websecure
+      service: n8n
+      tls:
+        certResolver: letsencrypt-staging
+
+    open-webui:
+      rule: "Host(`webui.aios.local`)"
+      entryPoints:
+        - websecure
+      service: open-webui
+      tls:
+        certResolver: letsencrypt-staging
+
+  services:
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://10.60.0.30:3000"
+    langfuse:
+      loadBalancer:
+        servers:
+          - url: "http://10.60.0.10:3000"
+    portainer:
+      loadBalancer:
+        servers:
+          - url: "http://10.60.0.50:9000"
+    dashy:
+      loadBalancer:
+        servers:
+          - url: "http://10.60.0.70:80"
+    uptime-kuma:
+      loadBalancer:
+        servers:
+          - url: "http://10.60.0.80:3001"
+    dozzle:
+      loadBalancer:
+        servers:
+          - url: "http://10.60.0.90:8080"
+    bifrost:
+      loadBalancer:
+        servers:
+          - url: "http://10.20.0.10:4000"
+    n8n:
+      loadBalancer:
+        servers:
+          - url: "http://10.20.0.20:5678"
+    open-webui:
+      loadBalancer:
+        servers:
+          - url: "http://10.20.0.50:8080"

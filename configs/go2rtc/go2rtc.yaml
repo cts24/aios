@@ -1,0 +1,14 @@
+api:
+  enabled: true
+  address: :1984
+
+webrtc:
+  candidates:
+    - 10.55.0.20:8555
+    - stun:8555
+
+streams:
+  office-cam-1:
+    - rtsp://${CAM1_USER}:${CAM1_PASSWORD}@office-public-ip:8554/stream1
+  office-cam-2:
+    - rtsp://${CAM2_USER}:${CAM2_PASSWORD}@office-public-ip:8554/stream2

@@ -1,0 +1,109 @@
+{
+  "name": "02 — Attendance Alerts",
+  "nodes": [
+    {
+      "id": "c1d2e3f4-0001-4000-8000-000000000001",
+      "name": "ERPNext Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "attendance-alert-{{client_id}}",
+        "options": {}
+      },
+      "webhookId": "attendance-alert-{{client_id}}"
+    },
+    {
+      "id": "c1d2e3f4-0001-4000-8000-000000000002",
+      "name": "Parse Event",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "employee_name", "value": "={{$json.employee_name}}" },
+            { "name": "status", "value": "={{$json.status}}" },
+            { "name": "date", "value": "={{$json.attendance_date}}" },
+            { "name": "manager_phone", "value": "={{$json.manager_phone}}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c1d2e3f4-0001-4000-8000-000000000003",
+      "name": "WhatsApp Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{whatsapp_phone_id}}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{whatsapp_token}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{manager_phone}}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\":\"📋 Attendance Alert\\nEmployee: {{employee_name}}\\nStatus: {{status}}\\nDate: {{date}}\"}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c1d2e3f4-0001-4000-8000-000000000004",
+      "name": "Langfuse Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.60.0.10:3000/api/public/observations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{langfuse_secret_key}}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "attendance-alert" },
+            { "name": "type", "value": "GENERATION" },
+            { "name": "input", "value": "={{$node['Parse Event'].json}}" },
+            { "name": "output", "value": "={{$node['WhatsApp Alert'].json}}" },
+            { "name": "projectId", "value": "={{client_id}}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "ERPNext Webhook": {
+      "main": [[ { "node": "Parse Event", "type": "main", "index": 0 } ]]
+    },
+    "Parse Event": {
+      "main": [[ { "node": "WhatsApp Alert", "type": "main", "index": 0 } ]]
+    },
+    "WhatsApp Alert": {
+      "main": [[ { "node": "Langfuse Log", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": ["hrms", "attendance"],
+  "versionId": "1.0.0"
+}

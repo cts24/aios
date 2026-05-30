@@ -1,0 +1,15 @@
+---
+- name: Create /aios directory
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+  loop:
+    - /aios
+    - /aios/configs
+    - /aios/n8n
+    - /aios/n8n/workflow-templates
+    - /aios/n8n/clients
+    - /aios/scripts
