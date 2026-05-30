@@ -67,7 +67,7 @@ services:
       ai-net:
         ipv4_address: 10.20.0.20
     depends_on:
-      - bifrost
+      - litellm
     env_file:
       - /aios/.env.ec1
     volumes:
@@ -82,7 +82,7 @@ services:
     networks:
       ai-net:
     depends_on:
-      - bifrost
+      - litellm
     env_file:
       - /aios/.env.ec1
     command: worker --concurrency=10
