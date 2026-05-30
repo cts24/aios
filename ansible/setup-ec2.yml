@@ -30,11 +30,12 @@
 
     - name: Copy env file
       copy:
-        src: "{{ env_file }}"
+        src: "/aios/{{ env_file }}"
         dest: /aios/.env
         owner: ubuntu
         group: ubuntu
         mode: "0600"
+        remote_src: yes
 
     - name: Create Docker networks for EC2 #1 (AI Core)
       community.docker.docker_network:
