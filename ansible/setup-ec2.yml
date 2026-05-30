@@ -28,14 +28,12 @@
         version: master
       when: not git_dir.stat.exists
 
-    - name: Copy env file
-      copy:
-        src: "/aios/{{ env_file }}"
-        dest: /aios/.env
+    - name: Set env file permissions
+      file:
+        path: "/aios/{{ env_file }}"
         owner: ubuntu
         group: ubuntu
         mode: "0600"
-        remote_src: yes
 
     - name: Create Docker networks for EC2 #1 (AI Core)
       community.docker.docker_network:
