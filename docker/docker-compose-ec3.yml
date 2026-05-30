@@ -27,19 +27,8 @@ services:
       - "0.0.0.0:5060:5060/udp"
       - "0.0.0.0:10000-10100:10000-10100/udp"
 
-  dograh:
-    image: dograh/dograh:latest
-    container_name: dograh
-    restart: unless-stopped
-    networks:
-      voice-net:
-        ipv4_address: 10.50.0.20
-    env_file:
-      - /aios/.env.ec3
-    volumes:
-      - /aios/configs/dograh:/etc/dograh
-    ports:
-      - "0.0.0.0:5001:5000"
+  # dograh: custom voice AI agent - build from source, not on Docker Hub
+  # dograh:  image: dograh/dograh:latest  # doesn't exist
 
   whisper:
     image: onerahmet/openai-whisper-asr-webservice:latest
@@ -56,15 +45,7 @@ services:
     ports:
       - "0.0.0.0:9000:9000"
 
-  kokoro:
-    image: kokoro-tts:latest
-    container_name: kokoro
-    restart: unless-stopped
-    networks:
-      voice-net:
-        ipv4_address: 10.50.0.40
-    ports:
-      - "0.0.0.0:5005:5000"
+  # kokoro-tts: custom TTS engine - build from source, not on Docker Hub
 
   # ── VISION ──
   frigate:
