@@ -13,13 +13,18 @@
   roles:
     - docker
     - ec2-setup
-    - aios-directories
 
   tasks:
-    - name: Check if git repo exists
+    - name: Check if /aios exists
       stat:
-        path: /aios/.git
-      register: git_dir
+        path: /aios
+      register: aios_dir
+
+    - name: Remove /aios if not a git repo
+      file:
+        path: /aios
+        state: absent
+      when: aios_dir.stat.exists and aios_dir.stat.isdir and not aios_dir.stat.islnk
 
     - name: Clone AIOS repository
       git:
@@ -27,7 +32,6 @@
         dest: /aios
         version: master
         force: yes
-      when: not git_dir.stat.exists
       register: git_clone
 
     - name: Pull latest if repo exists
@@ -36,8 +40,19 @@
         dest: /aios
         version: master
         force: yes
-      when: git_dir.stat.exists
+      when: not git_clone.changed
       register: git_pull
+
+    - name: Create additional directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+      loop:
+        - /aios/configs/mcp-server
+        - /aios/configs/odoo
 
     - name: Fix repo ownership
       file:
