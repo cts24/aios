@@ -90,7 +90,7 @@ services:
 
   # ── MONITORING ──
   langfuse:
-    image: ghcr.io/langfuse/langfuse:latest
+    image: ghcr.io/langfuse/langfuse:2
     container_name: langfuse
     restart: unless-stopped
     networks:
@@ -184,15 +184,6 @@ services:
     networks:
       monitoring-net:
         ipv4_address: 10.60.0.90
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
-  watchtower:
-    image: containrrr/watchtower:1.7.1
-    container_name: watchtower
-    restart: unless-stopped
-    networks:
-      monitoring-net:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 

@@ -5,5 +5,4 @@ decisions:
   - type: ban
     duration: 4h
 notifications:
-  - name: http_ban
-    webhook: http://traefik:8080/api/v1/decision
+  - http_ban
