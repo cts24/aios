@@ -13,3 +13,5 @@
     - /aios/n8n/workflow-templates
     - /aios/n8n/clients
     - /aios/scripts
+    - /aios/configs/mcp-server
+    - /aios/configs/odoo
