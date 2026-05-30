@@ -22,9 +22,9 @@ services:
       identity-net:
         ipv4_address: 10.80.0.10
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
-      - ../configs/keycloak:/opt/keycloak/data/import
+      - /aios/configs/keycloak:/opt/keycloak/data/import
     command: start-dev --import-realm
     ports:
       - "0.0.0.0:8080:8080"
@@ -37,7 +37,7 @@ services:
       identity-net:
         ipv4_address: 10.80.0.20
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - vault-data:/vault/data
     cap_add:
@@ -55,7 +55,7 @@ services:
     depends_on:
       - keycloak
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     ports:
       - "0.0.0.0:3002:3000"
 
@@ -68,10 +68,10 @@ services:
       app-net:
         ipv4_address: 10.70.0.10
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - odoo-data:/var/lib/odoo
-      - ../configs/odoo:/etc/odoo
+      - /aios/configs/odoo:/etc/odoo
     ports:
       - "0.0.0.0:8069:8069"
 
@@ -85,7 +85,7 @@ services:
     depends_on:
       - erpnext-db
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - erpnext-data:/home/frappe/frappe-bench/sites
     ports:
@@ -98,7 +98,7 @@ services:
     networks:
       app-net:
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - erpnext-db-data:/var/lib/mysql
 
@@ -111,7 +111,7 @@ services:
       app-net:
         ipv4_address: 10.70.0.30
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - twenty-crm-data:/app/data
     ports:
@@ -127,7 +127,7 @@ services:
     depends_on:
       - suitecrm-db
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - suitecrm-data:/bitnami
     ports:
@@ -156,7 +156,7 @@ services:
       app-net:
         ipv4_address: 10.70.0.40
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - calcom-data:/calcom/data
     ports:
@@ -170,7 +170,7 @@ services:
       app-net:
         ipv4_address: 10.70.0.50
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - paperless-data:/usr/src/paperless/data
       - paperless-media:/usr/src/paperless/media
@@ -185,7 +185,7 @@ services:
       app-net:
         ipv4_address: 10.70.0.55
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - docuseal-data:/data
     ports:
@@ -199,7 +199,7 @@ services:
       app-net:
         ipv4_address: 10.70.0.60
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - planka-data:/app/data
     ports:
@@ -215,7 +215,7 @@ services:
     depends_on:
       - rocketchat-db
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - rocketchat-data:/app/uploads
     ports:
@@ -244,7 +244,7 @@ services:
       app-net:
         ipv4_address: 10.70.0.70
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     volumes:
       - metabase-data:/metabase.db
     ports:
@@ -262,7 +262,7 @@ services:
     depends_on:
       - keycloak
     volumes:
-      - ../configs/issabel:/etc/issabel
+      - /aios/configs/issabel:/etc/issabel
     ports:
       - "0.0.0.0:8083:80"
       - "0.0.0.0:4443:443"
@@ -278,10 +278,10 @@ services:
       identity-net:
     working_dir: /app
     volumes:
-      - ../configs/mcp-server:/app
+      - /aios/configs/mcp-server:/app
     command: sh -c "npm install && node server.js"
     env_file:
-      - ../.env.ec4
+      - /aios/.env.ec4
     ports:
       - "0.0.0.0:3100:3100"
 

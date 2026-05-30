@@ -28,7 +28,7 @@ services:
       data-net:
         ipv4_address: 10.30.0.35
     env_file:
-      - ../.env.ec2
+      - /aios/.env.ec2
     ports:
       - "0.0.0.0:8001:8000"
 

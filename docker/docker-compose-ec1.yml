@@ -31,7 +31,7 @@ services:
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ../configs/traefik:/etc/traefik
+      - /aios/configs/traefik:/etc/traefik
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6
@@ -41,7 +41,7 @@ services:
       dmz-net:
         ipv4_address: 10.10.0.20
     volumes:
-      - ../configs/crowdsec:/etc/crowdsec
+      - /aios/configs/crowdsec:/etc/crowdsec
       - /var/log:/var/log:ro
 
   # ── AI GATEWAY ──
@@ -53,9 +53,9 @@ services:
       ai-net:
         ipv4_address: 10.20.0.10
     env_file:
-      - ../.env.ec1
+      - /aios/.env.ec1
     volumes:
-      - ../configs/bifrost:/etc/bifrost
+      - /aios/configs/bifrost:/etc/bifrost
     ports:
       - "4000:4000"
 
@@ -69,9 +69,9 @@ services:
     depends_on:
       - bifrost
     env_file:
-      - ../.env.ec1
+      - /aios/.env.ec1
     volumes:
-      - ../n8n:/home/node/.n8n
+      - /aios/n8n:/home/node/.n8n
     ports:
       - "5678:5678"
 
@@ -84,7 +84,7 @@ services:
     depends_on:
       - bifrost
     env_file:
-      - ../.env.ec1
+      - /aios/.env.ec1
     command: worker --concurrency=10
 
   # ── MONITORING ──
@@ -96,7 +96,7 @@ services:
       monitoring-net:
         ipv4_address: 10.60.0.10
     env_file:
-      - ../.env.ec1
+      - /aios/.env.ec1
     ports:
       - "3000:3000"
 
@@ -108,7 +108,7 @@ services:
       monitoring-net:
         ipv4_address: 10.60.0.20
     volumes:
-      - ../configs/prometheus:/etc/prometheus
+      - /aios/configs/prometheus:/etc/prometheus
       - prometheus-data:/prometheus
 
   grafana:
@@ -122,9 +122,9 @@ services:
       - prometheus
       - loki
     env_file:
-      - ../.env.ec1
+      - /aios/.env.ec1
     volumes:
-      - ../configs/grafana:/etc/grafana
+      - /aios/configs/grafana:/etc/grafana
       - grafana-data:/var/lib/grafana
     ports:
       - "3001:3000"
@@ -137,7 +137,7 @@ services:
       monitoring-net:
         ipv4_address: 10.60.0.40
     volumes:
-      - ../configs/loki:/etc/loki
+      - /aios/configs/loki:/etc/loki
       - loki-data:/loki
 
   portainer:
@@ -161,7 +161,7 @@ services:
       monitoring-net:
         ipv4_address: 10.60.0.70
     volumes:
-      - ../configs/dashy:/app/public/conf
+      - /aios/configs/dashy:/app/public/conf
 
   uptime-kuma:
     image: louislam/uptime-kuma:latest

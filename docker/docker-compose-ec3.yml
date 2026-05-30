@@ -22,7 +22,7 @@ services:
       voice-net:
         ipv4_address: 10.50.0.10
     volumes:
-      - ../configs/asterisk:/etc/asterisk
+      - /aios/configs/asterisk:/etc/asterisk
     ports:
       - "0.0.0.0:5060:5060/udp"
       - "0.0.0.0:10000-10100:10000-10100/udp"
@@ -35,9 +35,9 @@ services:
       voice-net:
         ipv4_address: 10.50.0.20
     env_file:
-      - ../.env.ec3
+      - /aios/.env.ec3
     volumes:
-      - ../configs/dograh:/etc/dograh
+      - /aios/configs/dograh:/etc/dograh
     ports:
       - "0.0.0.0:5001:5000"
 
@@ -76,10 +76,10 @@ services:
       vision-net:
         ipv4_address: 10.55.0.10
     volumes:
-      - ../configs/frigate:/config
+      - /aios/configs/frigate:/config
       - frigate-media:/media/frigate
     env_file:
-      - ../.env.ec3
+      - /aios/.env.ec3
     ports:
       - "0.0.0.0:8554:8554"
       - "0.0.0.0:8971:8971"
@@ -92,7 +92,7 @@ services:
       vision-net:
         ipv4_address: 10.55.0.20
     volumes:
-      - ../configs/go2rtc:/config
+      - /aios/configs/go2rtc:/config
     ports:
       - "0.0.0.0:1984:1984"
 
@@ -104,7 +104,7 @@ services:
       vision-net:
         ipv4_address: 10.55.0.30
     volumes:
-      - ../configs/mosquitto:/mosquitto/config
+      - /aios/configs/mosquitto:/mosquitto/config
     ports:
       - "0.0.0.0:1883:1883"
 
