@@ -43,6 +43,7 @@ services:
     volumes:
       - /aios/configs/crowdsec:/etc/crowdsec
       - /var/log:/var/log:ro
+      - crowdsec-data:/var/lib/crowdsec/data
 
   # ── AI GATEWAY ──
   litellm:
@@ -136,6 +137,7 @@ services:
     networks:
       monitoring-net:
         ipv4_address: 10.60.0.40
+    command: -config.file=/etc/loki/loki-config.yml
     volumes:
       - /aios/configs/loki:/etc/loki
       - loki-data:/loki
@@ -186,7 +188,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
   watchtower:
-    image: containrrr/watchtower:latest
+    image: containrrr/watchtower:1.7.1
     container_name: watchtower
     restart: unless-stopped
     networks:
@@ -211,3 +213,4 @@ volumes:
   loki-data:
   portainer-data:
   uptime-kuma-data:
+  crowdsec-data:
