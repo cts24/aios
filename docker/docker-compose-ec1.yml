@@ -34,7 +34,7 @@ services:
       - /aios/configs/traefik:/etc/traefik
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6
+    image: crowdsecurity/crowdsec:latest
     container_name: crowdsec
     restart: unless-stopped
     networks:
