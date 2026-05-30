@@ -21,7 +21,7 @@ services:
       - "0.0.0.0:6333:6333"
 
   mem0:
-    image: mem0ai/mem0:latest
+    image: mem0/mem0-api-server:latest
     container_name: mem0
     restart: unless-stopped
     networks:
