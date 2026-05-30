@@ -20,17 +20,8 @@ services:
     ports:
       - "0.0.0.0:6333:6333"
 
-  mem0:
-    image: mem0/mem0-api-server:latest
-    container_name: mem0
-    restart: unless-stopped
-    networks:
-      data-net:
-        ipv4_address: 10.30.0.35
-    env_file:
-      - /aios/.env.ec2
-    ports:
-      - "0.0.0.0:8001:8000"
+  # mem0 is ARM64-only - build from source on amd64
+  # See /aios/docker/mem0.Dockerfile for x86_64 build
 
   node-exporter:
     image: prom/node-exporter:latest
