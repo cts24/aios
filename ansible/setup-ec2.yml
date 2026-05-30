@@ -26,11 +26,25 @@
         repo: https://github.com/cts24/aios.git
         dest: /aios
         version: master
+        force: yes
       when: not git_dir.stat.exists
+      register: git_clone
+
+    - name: Fix repo ownership
+      file:
+        path: /aios
+        owner: ubuntu
+        group: ubuntu
+        recurse: yes
+      when: git_clone.changed
+
+    - name: Add safe.directory for git
+      command: git config --global --add safe.directory /aios
+      when: git_clone.changed
 
     - name: Set env file permissions
       file:
-        path: "/aios/{{ env_file }}"
+        path: "{{ env_file }}"
         owner: ubuntu
         group: ubuntu
         mode: "0600"
