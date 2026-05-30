@@ -45,9 +45,9 @@ services:
       - /var/log:/var/log:ro
 
   # ── AI GATEWAY ──
-  bifrost:
-    image: bifrost-gateway/bifrost:latest
-    container_name: bifrost
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
     restart: unless-stopped
     networks:
       ai-net:
@@ -55,7 +55,7 @@ services:
     env_file:
       - /aios/.env.ec1
     volumes:
-      - /aios/configs/bifrost:/etc/bifrost
+      - /aios/configs/bifrost:/app/config
     ports:
       - "4000:4000"
 
