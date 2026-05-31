@@ -142,8 +142,8 @@ services:
     environment:
       MYSQL_DATABASE: suitecrm
       MYSQL_USER: suitecrm
-      MYSQL_PASSWORD: ${SUITECRM_DB_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${SUITECRM_ROOT_PASSWORD}
+      MYSQL_PASSWORD: change-me-suitecrm
+      MYSQL_ROOT_PASSWORD: change-me-suitecrm-root
     volumes:
       - suitecrm-db-data:/var/lib/mysql
 
@@ -192,7 +192,7 @@ services:
       - "0.0.0.0:3005:3000"
 
   planka:
-    image: plagron/planka:latest
+    image: melkorm/planka:latest
     container_name: planka
     restart: unless-stopped
     networks:
@@ -222,7 +222,7 @@ services:
       - "0.0.0.0:3007:3000"
 
   rocketchat-db:
-    image: bitnami/mongodb:7.0
+    image: mongo:7
     container_name: rocketchat-db
     restart: unless-stopped
     networks:
@@ -230,8 +230,8 @@ services:
     environment:
       MONGODB_DATABASE: rocketchat
       MONGODB_USERNAME: rocketchat
-      MONGODB_PASSWORD: ${ROCKETCHAT_DB_PASSWORD}
-      MONGODB_ROOT_PASSWORD: ${ROCKETCHAT_ROOT_PASSWORD}
+      MONGODB_PASSWORD: change-me-rocketchat
+      MONGODB_ROOT_PASSWORD: change-me-rocketchat-root
     volumes:
       - rocketchat-db-data:/bitnami/mongodb
 
